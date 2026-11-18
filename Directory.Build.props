@@ -17,7 +17,8 @@
 
     <!-- XML docs alimentam o OpenAPI; CS1591 (membro público sem doc) seria ruído. -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <!-- CS1573: documentar só os parâmetros não óbvios é intencional. -->
+    <NoWarn>$(NoWarn);CS1591;CS1573</NoWarn>
 
     <!-- Central Package Management: versões só em Directory.Packages.props. -->
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>

@@ -52,6 +52,7 @@ internal static class PresentationExtensions
         services.AddScoped<IAuthorizationHandler, PlanFeatureHandler>();
         services.AddSingleton<IAuthorizationMiddlewareResultHandler, ApiAuthorizationResultHandler>();
         services.AddFlorunaRateLimiting(configuration);
+        services.AddTrustedProxies(configuration);
         services.AddSingleton<ProcessInfo>();
         services.AddOpenApi("v1");
 
@@ -60,6 +61,8 @@ internal static class PresentationExtensions
 
     public static WebApplication UsePresentation(this WebApplication app)
     {
+        // Primeiro de tudo: atrás do ALB, o IP do cliente vem no X-Forwarded-For.
+        app.UseForwardedHeaders();
         app.UseMiddleware<RequestContextMiddleware>();
         app.UseExceptionHandler();
 

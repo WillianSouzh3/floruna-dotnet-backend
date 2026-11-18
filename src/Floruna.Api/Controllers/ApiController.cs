@@ -1,4 +1,6 @@
+using System.Security.Claims;
 using Floruna.Api.Contracts;
+using Floruna.Domain.Audit;
 using Floruna.SharedKernel;
 using Microsoft.AspNetCore.Mvc;
 
@@ -30,9 +32,27 @@ public abstract class ApiController : ControllerBase
     protected ObjectResult Failure(Error error)
     {
         ArgumentNullException.ThrowIfNull(error);
+        if (error.RetryAfterSeconds is { } retryAfter)
+        {
+            Response.Headers.RetryAfter = retryAfter.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
         return new ObjectResult(ApiResponses.Error(HttpContext, error))
         {
             StatusCode = ApiResponses.StatusCodeFor(error.Type),
         };
     }
+
+    /// <summary>IP real do cliente (já corrigido pelo ForwardedHeaders atrás do load balancer).</summary>
+    protected string? ClientIp => HttpContext.Connection.RemoteIpAddress?.ToString();
+
+    /// <summary>Id do usuário do token.</summary>
+    protected Guid CurrentUserId => Guid.Parse(User.FindFirstValue("sub")!);
+
+    /// <summary>Quem está agindo, para a auditoria.</summary>
+    protected AuditActor CurrentActor() => new(
+        Guid.TryParse(User.FindFirstValue("sub"), out var id) ? id : null,
+        User.FindFirstValue("role") ?? string.Empty,
+        Guid.TryParse(User.FindFirstValue("impersonatedBy"), out var by) ? by : null,
+        ClientIp ?? string.Empty);
 }

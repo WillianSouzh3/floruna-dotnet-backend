@@ -70,6 +70,11 @@ public sealed class Tenant : AggregateRoot<TenantId>
 
     public bool CustomDomainVerified { get; private set; }
 
+    /// <summary>Valor que o lojista publica no TXT <c>_flora-verify.{dominio}</c> para provar posse.</summary>
+    public string? CustomDomainToken { get; private set; }
+
+    public DateTimeOffset? CustomDomainVerifiedAt { get; private set; }
+
     public string ReferralCode { get; private set; }
 
     public string Currency { get; private set; }
@@ -135,6 +140,48 @@ public sealed class Tenant : AggregateRoot<TenantId>
     public void Reactivate() => Status = TenantStatus.Active;
 
     public void MarkPastDue(DateTimeOffset since) => PastDueSince ??= since;
+
+    /// <summary>
+    /// Reivindica um domínio. Ainda NÃO roteia: só depois de provar posse via DNS
+    /// (senão qualquer lojista poderia sequestrar o domínio de outra pessoa).
+    /// Token novo a cada pedido: trocar de domínio invalida a prova anterior.
+    /// </summary>
+    public void RequestCustomDomain(CustomDomainName domain, string verificationToken)
+    {
+        ArgumentNullException.ThrowIfNull(domain);
+        ArgumentException.ThrowIfNullOrWhiteSpace(verificationToken);
+        CustomDomain = domain.Value;
+        CustomDomainToken = verificationToken;
+        CustomDomainVerified = false;
+        CustomDomainVerifiedAt = null;
+    }
+
+    /// <summary>Conclui a verificação se o TXT publicado contém o token esperado.</summary>
+    public Result VerifyCustomDomain(IReadOnlyCollection<string> publishedTxtValues, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(publishedTxtValues);
+        if (CustomDomain is null || CustomDomainToken is null)
+        {
+            return CustomDomainErrors.NothingPending;
+        }
+
+        if (!publishedTxtValues.Contains(CustomDomainToken, StringComparer.Ordinal))
+        {
+            return CustomDomainErrors.TxtMismatch(CustomDomainName.VerificationRecordFor(CustomDomain));
+        }
+
+        CustomDomainVerified = true;
+        CustomDomainVerifiedAt = now;
+        return Result.Success();
+    }
+
+    public void RemoveCustomDomain()
+    {
+        CustomDomain = null;
+        CustomDomainToken = null;
+        CustomDomainVerified = false;
+        CustomDomainVerifiedAt = null;
+    }
 }
 
 public sealed record TenantCreated(TenantId TenantId, string Slug, DateTimeOffset OccurredAt) : DomainEvent(OccurredAt);

@@ -79,6 +79,23 @@ public sealed class StaffUser : AggregateRoot<StaffUserId>, ITenantOwned
         return new StaffUser(StaffUserId.New(), tenantId, trimmedName, email, passwordHash, role, now);
     }
 
+    /// <summary>Troca o papel. O token antigo carrega o papel antigo, então as sessões são revogadas.</summary>
+    public Result ChangeRole(string role)
+    {
+        if (!TeamPolicy.AssignableRoles.Contains(role))
+        {
+            return IdentityErrors.RoleInvalid;
+        }
+
+        if (role != Role)
+        {
+            Role = role;
+            RevokeSessions();
+        }
+
+        return Result.Success();
+    }
+
     /// <summary>Invalida todos os tokens já emitidos para este usuário.</summary>
     public void RevokeSessions() => SessionVersion++;
 

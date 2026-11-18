@@ -12,6 +12,7 @@ public enum ErrorType
     Conflict = 3,
     Unauthorized = 4,
     Forbidden = 5,
+    TooManyRequests = 6,
 }
 
 /// <summary>
@@ -24,6 +25,9 @@ public sealed record Error(string Code, string Message, ErrorType Type = ErrorTy
 {
     /// <summary>Detalhes por campo, presentes em erros de validação.</summary>
     public IReadOnlyList<string> Issues { get; init; } = [];
+
+    /// <summary>Em bloqueios temporários: quantos segundos esperar (vira o header <c>Retry-After</c>).</summary>
+    public int? RetryAfterSeconds { get; init; }
 
     /// <summary>Representa "nenhum erro" dentro de um <see cref="Result"/> de sucesso.</summary>
     public static readonly Error None = new(string.Empty, string.Empty);
@@ -38,4 +42,7 @@ public sealed record Error(string Code, string Message, ErrorType Type = ErrorTy
     public static Error Unauthorized(string code, string message) => new(code, message, ErrorType.Unauthorized);
 
     public static Error Forbidden(string code, string message) => new(code, message, ErrorType.Forbidden);
+
+    public static Error TooManyRequests(string code, string message, int retryAfterSeconds) =>
+        new(code, message, ErrorType.TooManyRequests) { RetryAfterSeconds = retryAfterSeconds };
 }

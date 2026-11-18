@@ -38,6 +38,15 @@ public interface IAccessTokenIssuer
     string IssueFor(StaffUser user);
 
     string IssueFor(Customer customer);
+
+    /// <summary>Sessão de SUPORTE: token de master curto (15 min) carimbado com <c>impersonatedBy</c>.</summary>
+    string IssueImpersonationFor(StaffUser master, Guid impersonatedBy);
+
+    /// <summary>Token temporário (10 min) que só serve para concluir o 2FA. Não abre sessão.</summary>
+    string IssueTwoFactorPending(StaffUser user);
+
+    /// <summary>Valida o token do 2FA e devolve o usuário, ou null se inválido/vencido.</summary>
+    StaffUserId? ReadTwoFactorPending(string pendingToken);
 }
 
 /// <summary>Resolve a loja a partir do host visitado (subdomínio ou domínio próprio).</summary>

@@ -22,6 +22,73 @@ namespace Floruna.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Floruna.Domain.Audit.AuditEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("action");
+
+                    b.Property<Guid?>("ActorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_id");
+
+                    b.Property<string>("ActorRole")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("actor_role");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Entity")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("entity");
+
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("entity_id");
+
+                    b.Property<Guid?>("ImpersonatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("impersonated_by");
+
+                    b.Property<string>("Ip")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("ip");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("summary");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_audit_entries");
+
+                    b.HasIndex("TenantId", "CreatedAt")
+                        .HasDatabaseName("ix_audit_entries_tenant_id_created_at");
+
+                    b.ToTable("audit_entries", (string)null);
+                });
+
             modelBuilder.Entity("Floruna.Domain.Customers.Customer", b =>
                 {
                     b.Property<Guid>("Id")
@@ -68,6 +135,60 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_customers_tenant_id_email");
 
                     b.ToTable("customers", (string)null);
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Identity.SingleUseToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("consumed_at");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<Guid?>("IssuedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("issued_by");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("purpose");
+
+                    b.Property<string>("SecretHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("secret_hash");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_single_use_tokens");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_single_use_tokens_user_id");
+
+                    b.HasIndex("TenantId", "Purpose", "SecretHash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_single_use_tokens_tenant_id_purpose_secret_hash");
+
+                    b.HasIndex("TenantId", "UserId", "Purpose")
+                        .HasDatabaseName("ix_single_use_tokens_tenant_id_user_id_purpose");
+
+                    b.ToTable("single_use_tokens", (string)null);
                 });
 
             modelBuilder.Entity("Floruna.Domain.Identity.StaffUser", b =>
@@ -149,9 +270,18 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(253)")
                         .HasColumnName("custom_domain");
 
+                    b.Property<string>("CustomDomainToken")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("custom_domain_token");
+
                     b.Property<bool>("CustomDomainVerified")
                         .HasColumnType("boolean")
                         .HasColumnName("custom_domain_verified");
+
+                    b.Property<DateTimeOffset?>("CustomDomainVerifiedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("custom_domain_verified_at");
 
                     b.Property<string>("Locale")
                         .IsRequired()
@@ -209,7 +339,7 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                     b.HasIndex("CustomDomain")
                         .IsUnique()
                         .HasDatabaseName("ix_tenants_custom_domain")
-                        .HasFilter("custom_domain IS NOT NULL");
+                        .HasFilter("custom_domain IS NOT NULL AND custom_domain_verified");
 
                     b.HasIndex("ReferralCode")
                         .IsUnique()
@@ -222,6 +352,50 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                     b.ToTable("tenants", (string)null);
                 });
 
+            modelBuilder.Entity("Floruna.Infrastructure.Security.LoginAttemptBucket", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("key");
+
+                    b.Property<int>("Failures")
+                        .HasColumnType("integer")
+                        .HasColumnName("failures");
+
+                    b.Property<string>("GroupKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("group_key");
+
+                    b.Property<DateTimeOffset?>("LockedUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("locked_until");
+
+                    b.Property<DateTimeOffset>("WindowStartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("window_started_at");
+
+                    b.HasKey("Key")
+                        .HasName("pk_login_attempts");
+
+                    b.HasIndex("GroupKey")
+                        .HasDatabaseName("ix_login_attempts_group_key");
+
+                    b.ToTable("login_attempts", (string)null);
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Audit.AuditEntry", b =>
+                {
+                    b.HasOne("Floruna.Domain.Platform.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_audit_entries_tenants_tenant_id");
+                });
+
             modelBuilder.Entity("Floruna.Domain.Customers.Customer", b =>
                 {
                     b.HasOne("Floruna.Domain.Platform.Tenant", null)
@@ -230,6 +404,23 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_customers_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Identity.SingleUseToken", b =>
+                {
+                    b.HasOne("Floruna.Domain.Platform.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_single_use_tokens_tenants_tenant_id");
+
+                    b.HasOne("Floruna.Domain.Identity.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_single_use_tokens_staff_users_user_id");
                 });
 
             modelBuilder.Entity("Floruna.Domain.Identity.StaffUser", b =>

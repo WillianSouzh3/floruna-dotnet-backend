@@ -88,23 +88,33 @@ internal static class AuthenticationSetup
             var tokenTenant = principal.FindFirst("tenantId")?.Value;
             var tenant = context.HttpContext.RequestServices.GetRequiredService<ITenantContext>().Tenant;
 
-            if (tenant is null)
+            // Tokens de propósito específico (ex.: etapa do 2FA) nunca valem como sessão.
+            if (principal.HasClaim(c => c.Type == "purpose"))
             {
-                Reject(context, "Não foi possível resolver a loja desta sessão.");
+                Reject(context, "Token inválido.");
                 return;
             }
 
-            if (!string.Equals(tokenTenant, tenant.Id.ToString(), StringComparison.Ordinal))
+            // O superadmin navega por todas as lojas: não exige que o token seja da loja do host.
+            if (role != Roles.SuperAdmin)
             {
-                // Inclui o superadmin por enquanto: o acesso entre lojas (impersonação auditada) é P1.
-                Reject(context, IdentityErrors.SessionFromOtherTenant.Message);
-                return;
+                if (tenant is null)
+                {
+                    Reject(context, "Não foi possível resolver a loja desta sessão.");
+                    return;
+                }
+
+                if (!string.Equals(tokenTenant, tenant.Id.ToString(), StringComparison.Ordinal))
+                {
+                    Reject(context, IdentityErrors.SessionFromOtherTenant.Message);
+                    return;
+                }
             }
 
             if (Roles.Staff.Contains(role))
             {
                 var sessionVersion = int.TryParse(principal.FindFirst("sessionVersion")?.Value, out var v) ? v : 0;
-                if (!Guid.TryParse(principal.FindFirst("sub")?.Value, out var userId))
+                if (!Guid.TryParse(principal.FindFirst("sub")?.Value, out var userId) || !Guid.TryParse(tokenTenant, out var tenantId))
                 {
                     Reject(context, IdentityErrors.SessionRevoked.Message);
                     return;
@@ -112,7 +122,7 @@ internal static class AuthenticationSetup
 
                 var sender = context.HttpContext.RequestServices.GetRequiredService<ISender>();
                 var check = await sender.Send(
-                    new ValidateStaffSessionQuery(userId, role, sessionVersion), context.HttpContext.RequestAborted);
+                    new ValidateStaffSessionQuery(userId, tenantId, role, sessionVersion), context.HttpContext.RequestAborted);
                 if (check.IsFailure)
                 {
                     Reject(context, check.Error.Message);

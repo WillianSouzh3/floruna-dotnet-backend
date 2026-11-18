@@ -33,12 +33,38 @@ fechado. O front Next.js precisa continuar validando a sessão (`proxy.ts`, `jos
 | Slug com 1–2 caracteres | aceito pela regex | recusado (3–40) | a própria mensagem do Nest diz 3–40 |
 | Signup | 2 passos + compensação | 1 transação | atomicidade garantida pelo banco |
 
-## Ainda não implementado (backlog da Fase 1)
+## Complementos da Fase 1 (implementados)
 
-- 2FA por e-mail, bloqueio progressivo por tentativas (`AuthAttempt`), "esqueci minha senha" (RF-IAM-05).
-- Gestão de usuários da equipe com teto por plano (RF-IAM-06), `GET /tenants/me`.
-- Superadmin entre lojas e impersonação auditada; domínio próprio com verificação DNS.
-- Rate limit distribuído (Redis) e regra rate-based no AWS WAF.
+9. **Bloqueio progressivo de login** (`LoginLockoutPolicy`, igual ao Nest): conta+IP a partir de 5 falhas,
+   conta de qualquer IP a partir de 10, janela de 24 h. Contadores em `login_attempts` com UPSERT atômico do
+   PostgreSQL e chaves HMAC (sem e-mail/IP em claro). Resposta 429 `RATE_LIMITED` + `Retry-After`.
+10. **Credencial de uso único** (`SingleUseToken`) para 2FA (10 min), redefinição de senha (30 min) e
+    impersonação (60 s): só o hash é guardado; consumo por compare-and-swap; presa à loja.
+11. **2FA por e-mail** ligado quando há SMTP (mesma regra do Nest). O token pendente tem `purpose=2fa` e é
+    recusado como sessão.
+12. **E-mail em fila de background** (`Channel` + `BackgroundService`, Queue-Based Load Leveling): o request não
+    espera o SMTP e o "esqueci minha senha" responde no mesmo tempo com ou sem conta. Fila em memória:
+    vira outbox na Fase 4.
+13. **Equipe** com teto de usuários do plano efetivo, regras de "último master" (`TeamPolicy`) e auditoria.
+14. **Superadmin** navega por todas as lojas (sessão validada na loja do token, via `IgnoreQueryFilters` com loja
+    explícita, só em `StaffUserRepository`). **Impersonação**: código de 60 s trocado no host da loja por sessão
+    de master de 15 min com `impersonatedBy`, auditada na loja afetada.
+15. **Domínio próprio** com prova de posse por TXT (`_flora-verify.{apex}`). Índice único só entre domínios
+    VERIFICADOS (um pedido pendente não bloqueia o dono real).
+16. **IP real atrás do ALB**: `ForwardedHeaders` só confia em `Network:TrustedProxies` (faixas da VPC).
+
+### Bug encontrado na regra herdada
+
+A resolução de host remove `www.`, mas o domínio é guardado como digitado (`www.loja.com.br`). No Nest, essa
+combinação aparenta impedir que um domínio cadastrado com `www` roteie (não verificado em produção). Aqui a
+consulta procura as duas formas, coberto por teste de integração.
+
+## Ainda não implementado
+
+- Grant de pareamento do app móvel (QR code), capabilities finas (`@RequireCapability`), idioma do painel.
+- Endpoint `tls-allowed` (emissão de certificado sob demanda): na AWS, o TLS de domínio próprio vai para ACM/CloudFront (Fase 7).
+- Limpeza periódica de `login_attempts` e `single_use_tokens` vencidos (job da Fase 4).
+- Rate limit distribuído (Redis) e regra rate-based no AWS WAF (Fase 7).
 
 ## Consequências
 

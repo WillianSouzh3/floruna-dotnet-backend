@@ -12,4 +12,7 @@ public interface ITenantRepository
     void Add(Tenant tenant);
 
     Task<Tenant?> GetByIdAsync(TenantId id, CancellationToken cancellationToken);
+
+    /// <summary>Outra loja já tem este domínio VERIFICADO?</summary>
+    Task<bool> IsDomainVerifiedByAnotherAsync(string domain, TenantId except, CancellationToken cancellationToken);
 }

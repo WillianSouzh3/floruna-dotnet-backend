@@ -30,4 +30,9 @@ public sealed class SeedOptions
     public string? AdminPassword { get; set; }
 
     public string AdminName { get; set; } = "Administrador";
+
+    /// <summary>Superadmin da plataforma (mora na loja de seed e navega por todas).</summary>
+    public string? SuperAdminEmail { get; set; }
+
+    public string? SuperAdminPassword { get; set; }
 }

@@ -27,6 +27,12 @@ public static class TestApi
 
     public static async Task<(string Slug, string Email)> SignupStoreAsync(this FlorunaApiFactory factory, string? slug = null)
     {
+        var (s, e, _) = await factory.SignupStoreWithIdAsync(slug);
+        return (s, e);
+    }
+
+    public static async Task<(string Slug, string Email, Guid TenantId)> SignupStoreWithIdAsync(this FlorunaApiFactory factory, string? slug = null)
+    {
         slug ??= NewSlug();
         var email = $"dona@{slug}.com.br";
         var response = await factory.CreateClient().PostAsJsonAsync("/api/v1/tenants/signup", new
@@ -38,7 +44,8 @@ public static class TestApi
             password = StrongPassword,
         });
         response.EnsureSuccessStatusCode();
-        return (slug, email);
+        using var body = await response.ReadJsonAsync();
+        return (slug, email, Guid.Parse(body.Data().GetProperty("tenant").GetProperty("id").GetString()!));
     }
 
     public static async Task<string> LoginStaffAsync(this FlorunaApiFactory factory, string slug, string email)

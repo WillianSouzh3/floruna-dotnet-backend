@@ -13,6 +13,8 @@
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <PackageReference Include="EFCore.NamingConventions" />
     <PackageReference Include="BCrypt.Net-Next" />
+    <PackageReference Include="MailKit" />
+    <PackageReference Include="DnsClient" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" />
   </ItemGroup>

@@ -16,6 +16,9 @@ internal sealed class TenantRepository(FlorunaDbContext db) : ITenantRepository
 
     public Task<Tenant?> GetByIdAsync(TenantId id, CancellationToken cancellationToken) =>
         db.Tenants.FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
+
+    public Task<bool> IsDomainVerifiedByAnotherAsync(string domain, TenantId except, CancellationToken cancellationToken) =>
+        db.Tenants.AnyAsync(t => t.CustomDomain == domain && t.CustomDomainVerified && t.Id != except, cancellationToken);
 }
 
 internal sealed class StaffUserRepository(FlorunaDbContext db) : IStaffUserRepository
@@ -29,6 +32,25 @@ internal sealed class StaffUserRepository(FlorunaDbContext db) : IStaffUserRepos
         db.StaffUsers.FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
 
     public Task<int> CountAsync(CancellationToken cancellationToken) => db.StaffUsers.CountAsync(cancellationToken);
+
+    public Task<int> CountByRoleAsync(string role, CancellationToken cancellationToken) =>
+        db.StaffUsers.CountAsync(u => u.Role == role, cancellationToken);
+
+    public async Task<IReadOnlyList<StaffUser>> ListAsync(CancellationToken cancellationToken) =>
+        await db.StaffUsers.OrderBy(u => u.CreatedAt).ToListAsync(cancellationToken);
+
+    public void Remove(StaffUser user) => db.StaffUsers.Remove(user);
+
+    // IgnoreQueryFilters: escape CONSCIENTE do filtro da loja, sempre com a loja
+    // explícita na consulta. Só estes dois métodos fazem isso (ver ADR 0002).
+    public Task<StaffUser?> GetInTenantAsync(StaffUserId id, TenantId tenantId, CancellationToken cancellationToken) =>
+        db.StaffUsers.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Id == id && u.TenantId == tenantId, cancellationToken);
+
+    public Task<StaffUser?> FindMasterOfTenantAsync(TenantId tenantId, CancellationToken cancellationToken) =>
+        db.StaffUsers.IgnoreQueryFilters()
+            .Where(u => u.TenantId == tenantId && u.Role == Roles.Master)
+            .OrderBy(u => u.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
 }
 
 internal sealed class CustomerRepository(FlorunaDbContext db) : ICustomerRepository

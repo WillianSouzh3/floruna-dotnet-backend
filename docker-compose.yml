@@ -34,6 +34,11 @@ services:
       # Seed de desenvolvimento: loja flora-lis + usuário master.
       Seed__AdminEmail: admin@floraelis.com.br
       Seed__AdminPassword: ${SEED_ADMIN_PASSWORD:-troque-esta-senha-local}
+      Seed__SuperAdminEmail: suporte@floruna.com.br
+      Seed__SuperAdminPassword: ${SEED_SUPERADMIN_PASSWORD:-troque-esta-senha-local}
+      # E-mail (e 2FA): descomente para usar o Mailpit abaixo.
+      # Smtp__Host: mailpit
+      # Smtp__Port: "1025"
     ports:
       - "4000:4000"
     depends_on:

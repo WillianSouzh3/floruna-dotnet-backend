@@ -9,7 +9,7 @@ using FluentValidation;
 namespace Floruna.Application.Identity;
 
 /// <summary>Login de cliente na vitrine (<c>POST /auth/login</c>).</summary>
-public sealed record LoginCustomerCommand(string Email, string Password) : ICommand<AuthResult>;
+public sealed record LoginCustomerCommand(string Email, string Password, string? ClientIp = null) : ICommand<AuthResult>;
 
 internal sealed class LoginCustomerValidator : AbstractValidator<LoginCustomerCommand>
 {
@@ -24,7 +24,8 @@ internal sealed class LoginCustomerHandler(
     ITenantContext tenantContext,
     ICustomerRepository customers,
     IPasswordHasher passwordHasher,
-    IAccessTokenIssuer tokens) : ICommandHandler<LoginCustomerCommand, AuthResult>
+    IAccessTokenIssuer tokens,
+    ILoginAttemptGuard attempts) : ICommandHandler<LoginCustomerCommand, AuthResult>
 {
     public async Task<Result<AuthResult>> Handle(LoginCustomerCommand request, CancellationToken cancellationToken)
     {
@@ -33,13 +34,22 @@ internal sealed class LoginCustomerHandler(
             return TenantErrors.NotResolved;
         }
 
+        var remaining = await attempts.RemainingLockAsync(LoginScope.Customer, request.Email, request.ClientIp, cancellationToken);
+        if (remaining > TimeSpan.Zero)
+        {
+            return IdentityApplicationErrors.Locked(remaining);
+        }
+
         var email = Email.Create(request.Email);
         var customer = email.IsSuccess ? await customers.FindByEmailAsync(email.Value, cancellationToken) : null;
 
         if (!passwordHasher.Verify(request.Password, customer?.PasswordHash) || customer is null)
         {
+            await attempts.RecordFailureAsync(LoginScope.Customer, request.Email, request.ClientIp, cancellationToken);
             return IdentityErrors.InvalidCredentials;
         }
+
+        await attempts.ClearAsync(LoginScope.Customer, request.Email, cancellationToken);
 
         return new AuthResult(
             tokens.IssueFor(customer),

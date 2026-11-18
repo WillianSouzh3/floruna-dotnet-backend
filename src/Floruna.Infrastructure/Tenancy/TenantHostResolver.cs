@@ -10,19 +10,6 @@ using Microsoft.Extensions.Primitives;
 
 namespace Floruna.Infrastructure.Tenancy;
 
-public sealed class PlatformOptions
-{
-    public const string SectionName = "Platform";
-
-    /// <summary>Domínio raiz da plataforma (lojas em <c>{slug}.{dominio}</c>).</summary>
-    public string Domain { get; set; } = "floruna.com.br";
-
-    /// <summary>Loja servida no domínio raiz, em <c>localhost</c> e por IP.</summary>
-    public string DefaultTenantSlug { get; set; } = "flora-lis";
-
-    public TimeSpan CacheTtl { get; set; } = TimeSpan.FromSeconds(60);
-}
-
 /// <summary>
 /// Resolve a loja pelo host, com as MESMAS regras do
 /// <c>TenantHostResolverService</c> do Nest, e cache de 60 s (Cache-Aside).
@@ -38,7 +25,7 @@ public sealed class PlatformOptions
 internal sealed partial class TenantHostResolver(
     IServiceScopeFactory scopeFactory,
     IMemoryCache cache,
-    IOptions<PlatformOptions> options,
+    IOptions<PlatformSettings> options,
     TimeProvider clock) : ITenantResolver, IDisposable
 {
     private CancellationTokenSource _reset = new();
@@ -120,11 +107,24 @@ internal sealed partial class TenantHostResolver(
 
         var tenant = lookup.Kind == "slug"
             ? await tenants.FirstOrDefaultAsync(t => t.Slug == TenantSlug.FromPersistence(lookup.Value), cancellationToken)
-            : await tenants.FirstOrDefaultAsync(t => t.CustomDomain == lookup.Value && t.CustomDomainVerified, cancellationToken);
+            : await FindByCustomDomainAsync(tenants, lookup.Value, cancellationToken);
 
         return tenant is null
             ? null
             : new ResolvedTenant(tenant.Id, tenant.Slug.Value, tenant.Status, tenant.EffectivePlan(clock.GetUtcNow()));
+    }
+
+    /// <summary>
+    /// O host chega SEM "www." (a normalização remove), mas o lojista pode ter
+    /// cadastrado <c>www.loja.com.br</c>. Procura as duas formas; sem isso, um
+    /// domínio cadastrado com www nunca roteia (combinação de regras herdada do Nest).
+    /// </summary>
+    private static Task<Tenant?> FindByCustomDomainAsync(IQueryable<Tenant> tenants, string host, CancellationToken cancellationToken)
+    {
+        var withWww = "www." + host;
+        return tenants
+            .Where(t => (t.CustomDomain == host || t.CustomDomain == withWww) && t.CustomDomainVerified)
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     private static bool IsIpAddress(string host) =>

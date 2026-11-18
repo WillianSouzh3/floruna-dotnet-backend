@@ -14,14 +14,16 @@ namespace Floruna.Application.Identity;
 /// por esta checagem (só <c>ADMIN_ROLES</c>). Aqui todo papel de equipe
 /// passa, então revogar a sessão do caixa também funciona.
 /// </remarks>
-public sealed record ValidateStaffSessionQuery(Guid UserId, string Role, int SessionVersion) : IQuery<bool>;
+/// <param name="TenantId">Loja do TOKEN. Para a equipe é a loja da requisição; para o
+/// superadmin, que navega por todas, é a loja onde a conta dele mora.</param>
+public sealed record ValidateStaffSessionQuery(Guid UserId, Guid TenantId, string Role, int SessionVersion) : IQuery<bool>;
 
 internal sealed class ValidateStaffSessionHandler(IStaffUserRepository users)
     : IQueryHandler<ValidateStaffSessionQuery, bool>
 {
     public async Task<Result<bool>> Handle(ValidateStaffSessionQuery request, CancellationToken cancellationToken)
     {
-        var user = await users.GetByIdAsync(new StaffUserId(request.UserId), cancellationToken);
+        var user = await users.GetInTenantAsync(new StaffUserId(request.UserId), new TenantId(request.TenantId), cancellationToken);
         if (user is null || user.Role != request.Role || user.SessionVersion != request.SessionVersion)
         {
             return IdentityErrors.SessionRevoked;

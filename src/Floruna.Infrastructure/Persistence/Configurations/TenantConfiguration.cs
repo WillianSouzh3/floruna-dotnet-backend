@@ -24,7 +24,10 @@ internal sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
         builder.HasIndex(t => t.Slug).IsUnique();
 
         builder.Property(t => t.CustomDomain).HasMaxLength(253);
-        builder.HasIndex(t => t.CustomDomain).IsUnique().HasFilter("custom_domain IS NOT NULL");
+        builder.Property(t => t.CustomDomainToken).HasMaxLength(64);
+        // Único só entre VERIFICADOS: um pedido pendente (de quem não provou posse)
+        // não pode bloquear o dono real do domínio.
+        builder.HasIndex(t => t.CustomDomain).IsUnique().HasFilter("custom_domain IS NOT NULL AND custom_domain_verified");
 
         builder.Property(t => t.ReferralCode).HasMaxLength(24).IsRequired();
         builder.HasIndex(t => t.ReferralCode).IsUnique();

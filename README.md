@@ -52,7 +52,14 @@ docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 dotnet 
 | POST | `/api/v1/auth/admin/login` | público, rate-limited |
 | POST | `/api/v1/auth/register` · `/api/v1/auth/login` | público (cliente), rate-limited |
 | GET | `/api/v1/auth/me` | autenticado |
+| POST | `/api/v1/auth/admin/verify-otp` | público (2FA, quando há SMTP) |
+| POST | `/api/v1/auth/admin/forgot-password` · `/reset-password` | público, rate-limited |
 | POST | `/api/v1/auth/admin/revoke-sessions` | `superadmin`, `master`, `gerente` |
+| POST | `/api/v1/auth/admin/impersonate/{tenantId}` | `superadmin` (auditado) |
+| POST | `/api/v1/auth/admin/impersonation/exchange` | público (código de 60 s) |
+| GET · POST · PATCH · DELETE | `/api/v1/users`, `/users/{id}`, `/users/me/password` | equipe (`master` gerencia) |
+| GET | `/api/v1/tenants/me` | equipe da loja |
+| GET · POST · DELETE | `/api/v1/tenants/me/domain`, `POST /tenants/me/domain/verify` | `master` (plano com domínio próprio) |
 | GET | `/api/v1/health`, `/health/live`, `/health/ready` | público |
 
 A loja vem do header `x-tenant-host` (enviado pelo BFF) ou do `Host`: `flora-lis.localhost:3000` → loja `flora-lis`.
@@ -74,6 +81,10 @@ curl -X POST localhost:4000/api/v1/auth/admin/login -H 'x-tenant-host: flora-lis
 | `Database:MigrateOnStartup` | `Database__MigrateOnStartup` | `true` só em dev |
 | `Seed:AdminEmail` / `AdminPassword` | `Seed__AdminEmail` | cria loja + master (dev) |
 | `RateLimiting:AuthPermitLimit` | `RateLimiting__AuthPermitLimit` | `5` por minuto |
+| `Smtp:Host` / `Port` / `Username` / `Password` / `From` | `Smtp__Host` | sem host = e-mail e 2FA desligados |
+| `Authentication:TwoFactorEnabled` | `Authentication__TwoFactorEnabled` | `true` (só vale com SMTP) |
+| `Network:TrustedProxies` | `Network__TrustedProxies__0` | `10.0.0.0/16` (VPC do ALB) |
+| `Seed:SuperAdminEmail` / `SuperAdminPassword` | `Seed__SuperAdminEmail` | superadmin de dev |
 | `Cors:AllowedOrigins` | `Cors__AllowedOrigins__0` | `http://localhost:3000` |
 | `GIT_SHA` | `GIT_SHA` | SHA do commit (preenchido pelo CI na imagem) |
 
@@ -84,7 +95,7 @@ Configuração inválida impede a API de subir (fail-fast).
 | Fase | Conteúdo | Status |
 |---|---|---|
 | 0 | Fundação: solution, mediator, envelope, Options, health, CI, testes de arquitetura | ✅ |
-| 1 | Plataforma + Identity: tenant por host, query filter fail-closed, JWT compatível, planos | ✅ (núcleo) |
+| 1 | Plataforma + Identity: tenant por host, filtro fail-closed, JWT compatível, planos, 2FA, bloqueio, reset de senha, equipe, superadmin, domínio próprio | ✅ |
 | 2 | Catálogo | |
 | 3 | Estoque (lotes FEFO, ledger, reservas) | |
 | 4 | Checkout + Pedido + Outbox | |

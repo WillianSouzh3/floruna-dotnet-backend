@@ -49,17 +49,26 @@ public static partial class DatabaseInitializer
         using (provider.GetRequiredService<TenantContext>()
             .Enter(new ResolvedTenant(tenant.Id, tenant.Slug.Value, tenant.Status, tenant.EffectivePlan(now))))
         {
-            var email = Email.Create(seed.AdminEmail).Value;
-            if (!await db.StaffUsers.AnyAsync(u => u.Email == email, cancellationToken))
+            await EnsureUserAsync(seed.AdminEmail!, seed.AdminPassword!, seed.AdminName, Roles.Master);
+            if (!string.IsNullOrWhiteSpace(seed.SuperAdminEmail) && !string.IsNullOrWhiteSpace(seed.SuperAdminPassword))
             {
-                var hash = provider.GetRequiredService<IPasswordHasher>().Hash(seed.AdminPassword!);
-                db.StaffUsers.Add(StaffUser.Create(tenant.Id, seed.AdminName, email, hash, Roles.Master, now).Value);
+                await EnsureUserAsync(seed.SuperAdminEmail, seed.SuperAdminPassword, "Suporte Floruna", Roles.SuperAdmin);
             }
 
             await db.SaveChangesAsync(cancellationToken);
         }
 
         LogSeeded(logger, seed.TenantSlug);
+
+        async Task EnsureUserAsync(string rawEmail, string password, string name, string role)
+        {
+            var email = Email.Create(rawEmail).Value;
+            if (!await db.StaffUsers.AnyAsync(u => u.Email == email, cancellationToken))
+            {
+                var hash = provider.GetRequiredService<IPasswordHasher>().Hash(password);
+                db.StaffUsers.Add(StaffUser.Create(tenant.Id, name, email, hash, role, now).Value);
+            }
+        }
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Migrations aplicadas")]

@@ -1,7 +1,10 @@
 using Floruna.Application.Abstractions;
+using Floruna.Domain.Audit;
 using Floruna.Domain.Customers;
 using Floruna.Domain.Identity;
 using Floruna.Domain.Platform;
+using Floruna.Infrastructure.Dns;
+using Floruna.Infrastructure.Mail;
 using Floruna.Infrastructure.Persistence;
 using Floruna.Infrastructure.Persistence.Repositories;
 using Floruna.Infrastructure.Security;
@@ -34,6 +37,17 @@ public static class DependencyInjection
         services.AddMemoryCache();
         services.AddSingleton<ITenantResolver, TenantHostResolver>();
 
+        services.AddScoped<ILoginAttemptGuard, LoginAttemptGuard>();
+        services.AddSingleton<ICredentialHasher, CredentialHasher>();
+        services.AddSingleton<IDnsTxtResolver, DnsTxtResolver>();
+
+        // E-mail: a fila é singleton (compartilhada entre requisições) e exposta como
+        // IEmailSender; o despachante é um hosted service que a esvazia.
+        services.AddSingleton<IEmailTransport, SmtpEmailTransport>();
+        services.AddSingleton<BackgroundEmailQueue>();
+        services.AddSingleton<IEmailSender>(sp => sp.GetRequiredService<BackgroundEmailQueue>());
+        services.AddHostedService<EmailDispatcher>();
+
         return services;
     }
 
@@ -55,8 +69,10 @@ public static class DependencyInjection
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
-        services.AddOptions<PlatformOptions>().Bind(configuration.GetSection(PlatformOptions.SectionName));
+        services.AddOptions<PlatformSettings>().Bind(configuration.GetSection(PlatformSettings.SectionName));
+        services.AddOptions<AuthenticationSettings>().Bind(configuration.GetSection(AuthenticationSettings.SectionName));
         services.AddOptions<SeedOptions>().Bind(configuration.GetSection(SeedOptions.SectionName));
+        services.AddOptions<SmtpSettings>().Bind(configuration.GetSection(SmtpSettings.SectionName));
     }
 
     private static void AddPersistence(IServiceCollection services)
@@ -73,6 +89,8 @@ public static class DependencyInjection
         services.AddScoped<ITenantRepository, TenantRepository>();
         services.AddScoped<IStaffUserRepository, StaffUserRepository>();
         services.AddScoped<ICustomerRepository, CustomerRepository>();
+        services.AddScoped<ISingleUseTokenRepository, SingleUseTokenRepository>();
+        services.AddScoped<IAuditRepository, AuditRepository>();
 
         services.AddHealthChecks().AddDbContextCheck<FlorunaDbContext>(DatabaseHealthCheckName, tags: ["ready"]);
     }

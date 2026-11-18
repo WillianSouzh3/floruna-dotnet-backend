@@ -1,5 +1,6 @@
 using System.Reflection;
 using Floruna.Application.Abstractions;
+using Floruna.Domain.Audit;
 using Floruna.Domain.Customers;
 using Floruna.Domain.Identity;
 using Floruna.Domain.Platform;
@@ -23,6 +24,13 @@ public sealed class FlorunaDbContext(DbContextOptions<FlorunaDbContext> options,
     public DbSet<StaffUser> StaffUsers => Set<StaffUser>();
 
     public DbSet<Customer> Customers => Set<Customer>();
+
+    public DbSet<SingleUseToken> SingleUseTokens => Set<SingleUseToken>();
+
+    public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+
+    /// <summary>Contadores de tentativas de login. Global (a chave já embute a loja).</summary>
+    internal DbSet<Security.LoginAttemptBucket> LoginAttempts => Set<Security.LoginAttemptBucket>();
 
     /// <summary>
     /// Lido pelo EF a CADA consulta (vira parâmetro SQL). Sem loja no
