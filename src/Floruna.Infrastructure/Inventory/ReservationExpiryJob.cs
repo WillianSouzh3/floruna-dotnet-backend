@@ -20,7 +20,7 @@ namespace Floruna.Infrastructure.Inventory;
 /// a reserva é travada (<c>FOR UPDATE</c>) e a transição é idempotente, então a
 /// segunda réplica simplesmente não encontra nada para fazer. Sem lock distribuído.</para>
 /// </remarks>
-internal sealed partial class ReservationExpiryJob(IServiceScopeFactory scopes, TimeProvider clock, ILogger<ReservationExpiryJob> logger)
+internal sealed partial class ReservationExpiryJob(IServiceScopeFactory scopes, TimeProvider clock, Microsoft.Extensions.Options.IOptions<BackgroundJobsOptions> options, ILogger<ReservationExpiryJob> logger)
     : BackgroundService
 {
     public static readonly TimeSpan Interval = TimeSpan.FromMinutes(1);
@@ -28,6 +28,11 @@ internal sealed partial class ReservationExpiryJob(IServiceScopeFactory scopes, 
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (!options.Value.Enabled)
+        {
+            return;
+        }
+
         using var timer = new PeriodicTimer(Interval, clock);
         do
         {

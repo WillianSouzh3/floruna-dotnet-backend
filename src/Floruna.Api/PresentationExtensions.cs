@@ -27,7 +27,13 @@ internal static class PresentationExtensions
         services.AddSingleton<IConfigureOptions<Microsoft.AspNetCore.Cors.Infrastructure.CorsOptions>, ConfigureFrontendCors>();
 
         services
-            .AddControllers(options => options.Filters.Add<ApiEnvelopeResultFilter>())
+            .AddControllers(options =>
+            {
+                options.Filters.Add<ApiEnvelopeResultFilter>();
+                // Validação de NEGÓCIO é do FluentValidation (mensagens pt-BR do contrato).
+                // Sem isto, todo `string` não anulável viraria "obrigatório" com mensagem em inglês.
+                options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
+            })
             .AddJsonOptions(json => json.JsonSerializerOptions.Converters.Add(new OptionalJsonConverterFactory()))
             .ConfigureApiBehaviorOptions(options =>
                 // Erro de binding/model state no mesmo formato do ValidationPipe do Nest.

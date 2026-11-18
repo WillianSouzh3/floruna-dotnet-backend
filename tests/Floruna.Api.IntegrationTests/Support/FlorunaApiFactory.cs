@@ -37,7 +37,9 @@ public sealed class FlorunaApiFactory : WebApplicationFactory<Program>, IAsyncLi
             ["ConnectionStrings:Floruna"] = ConnectionString,
             ["Database:MigrateOnStartup"] = "true",
             ["Jwt:Secret"] = JwtSecret,
+            ["BackgroundJobs:Enabled"] = "false",
             [$"{RateLimitingSettings.SectionName}:{nameof(RateLimitingSettings.AuthPermitLimit)}"] = "10000",
+            [$"{RateLimitingSettings.SectionName}:{nameof(RateLimitingSettings.CheckoutPermitLimit)}"] = "10000",
         }));
 
         builder.ConfigureServices(services =>

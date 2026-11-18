@@ -3,9 +3,12 @@ using Floruna.Application.Abstractions;
 using Floruna.Domain.Audit;
 using Floruna.Domain.Catalog;
 using Floruna.Domain.Customers;
+using Floruna.Domain.Delivery;
 using Floruna.Domain.Identity;
 using Floruna.Domain.Inventory;
+using Floruna.Domain.Ordering;
 using Floruna.Domain.Platform;
+using Floruna.Domain.Promotions;
 using Floruna.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -44,6 +47,22 @@ public sealed class FlorunaDbContext(DbContextOptions<FlorunaDbContext> options,
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
 
     public DbSet<StockReservation> StockReservations => Set<StockReservation>();
+
+    public DbSet<Coupon> Coupons => Set<Coupon>();
+
+    public DbSet<CouponRedemption> CouponRedemptions => Set<CouponRedemption>();
+
+    public DbSet<DeliveryZone> DeliveryZones => Set<DeliveryZone>();
+
+    public DbSet<CapacityRule> CapacityRules => Set<CapacityRule>();
+
+    public DbSet<Order> Orders => Set<Order>();
+
+    internal DbSet<Configurations.DeliverySlotUsage> DeliverySlotUsage => Set<Configurations.DeliverySlotUsage>();
+
+    internal DbSet<Outbox.OutboxMessage> OutboxMessages => Set<Outbox.OutboxMessage>();
+
+    internal DbSet<Outbox.OutboxReceipt> OutboxReceipts => Set<Outbox.OutboxReceipt>();
 
     /// <summary>Contadores de tentativas de login. Global (a chave já embute a loja).</summary>
     internal DbSet<Security.LoginAttemptBucket> LoginAttempts => Set<Security.LoginAttemptBucket>();
@@ -116,6 +135,7 @@ public sealed class FlorunaDbContext(DbContextOptions<FlorunaDbContext> options,
         configurationBuilder.Properties<CategoryId>().HaveConversion<CategoryIdConverter>();
         configurationBuilder.Properties<CollectionId>().HaveConversion<CollectionIdConverter>();
         configurationBuilder.Properties<VariantId>().HaveConversion<VariantIdConverter>().HaveMaxLength(28);
+        configurationBuilder.Properties<OrderId>().HaveConversion<OrderIdConverter>();
         configurationBuilder.Properties<Email>().HaveConversion<EmailConverter>().HaveMaxLength(Email.MaxLength);
         configurationBuilder.Properties<Enum>().HaveConversion<string>().HaveMaxLength(32);
     }

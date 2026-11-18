@@ -115,4 +115,10 @@ public interface IInventoryRepository
     Task<StockReservation?> GetReservationAsync(Guid id, CancellationToken cancellationToken);
 
     Task<StockReservation?> FindReservationByKeyAsync(string idempotencyKey, CancellationToken cancellationToken);
+
+    /// <summary>Como <see cref="FindReservationByKeyAsync"/>, travando a reserva até o fim da transação.</summary>
+    Task<StockReservation?> GetReservationByKeyForUpdateAsync(string idempotencyKey, CancellationToken cancellationToken);
+
+    /// <summary>Já existe movimento com esta chave? (baixa de venda idempotente).</summary>
+    Task<bool> MovementExistsAsync(string idempotencyKey, CancellationToken cancellationToken);
 }

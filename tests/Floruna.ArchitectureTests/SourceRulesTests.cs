@@ -32,6 +32,7 @@ public sealed partial class SourceRulesTests
         "FlorunaDbContext.cs",   // só cita no comentário do filtro
         "Repositories.cs",       // sessão do superadmin e impersonação (loja explícita na consulta)
         "InventoryQueries.cs",   // job de expiração de reservas (varre todas as lojas)
+        "CommerceRepositories.cs", // job de pedidos abandonados (varre todas as lojas)
     };
 
     [Fact]

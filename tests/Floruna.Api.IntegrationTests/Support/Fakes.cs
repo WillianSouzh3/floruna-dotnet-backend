@@ -40,6 +40,8 @@ public sealed partial class CapturingEmailTransport : IEmailTransport
 
     public bool AnySentTo(string to) => _sent.Any(m => m.To == to);
 
+    public int CountTo(string to) => _sent.Count(m => m.To == to);
+
     public static string CodeIn(EmailMessage message) => SixDigits().Match(message.TextBody).Value;
 
     public static string ResetTokenIn(EmailMessage message) => ResetToken().Match(message.TextBody).Groups[1].Value;

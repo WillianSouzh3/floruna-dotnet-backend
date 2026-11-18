@@ -1,16 +1,25 @@
 using Floruna.Application.Abstractions;
 using Floruna.Application.Catalog;
+using Floruna.Application.Delivery;
 using Floruna.Application.Inventory;
+using Floruna.Application.Ordering;
+using Floruna.Application.Outbox;
+using Floruna.Application.Promotions;
 using Floruna.Domain.Audit;
 using Floruna.Domain.Catalog;
 using Floruna.Domain.Customers;
+using Floruna.Domain.Delivery;
 using Floruna.Domain.Identity;
 using Floruna.Domain.Inventory;
+using Floruna.Domain.Ordering;
 using Floruna.Domain.Platform;
+using Floruna.Domain.Promotions;
 using Floruna.Infrastructure.Catalog;
 using Floruna.Infrastructure.Dns;
 using Floruna.Infrastructure.Inventory;
 using Floruna.Infrastructure.Mail;
+using Floruna.Infrastructure.Ordering;
+using Floruna.Infrastructure.Outbox;
 using Floruna.Infrastructure.Persistence;
 using Floruna.Infrastructure.Persistence.Repositories;
 using Floruna.Infrastructure.Security;
@@ -53,6 +62,7 @@ public static class DependencyInjection
         services.AddSingleton<BackgroundEmailQueue>();
         services.AddSingleton<IEmailSender>(sp => sp.GetRequiredService<BackgroundEmailQueue>());
         services.AddHostedService<EmailDispatcher>();
+        services.AddSingleton<IEmailDelivery, SmtpEmailDelivery>();
 
         return services;
     }
@@ -79,16 +89,18 @@ public static class DependencyInjection
         services.AddOptions<AuthenticationSettings>().Bind(configuration.GetSection(AuthenticationSettings.SectionName));
         services.AddOptions<SeedOptions>().Bind(configuration.GetSection(SeedOptions.SectionName));
         services.AddOptions<SmtpSettings>().Bind(configuration.GetSection(SmtpSettings.SectionName));
+        services.AddOptions<BackgroundJobsOptions>().Bind(configuration.GetSection(BackgroundJobsOptions.SectionName));
     }
 
     private static void AddPersistence(IServiceCollection services)
     {
         services.AddScoped<TenantStampInterceptor>();
+        services.AddSingleton<DomainEventsToOutboxInterceptor>();
         services.AddDbContext<FlorunaDbContext>((sp, options) => options
             .UseNpgsql(sp.GetRequiredService<IOptions<DatabaseOptions>>().Value.ConnectionString, npgsql => npgsql
                 .MigrationsHistoryTable("__ef_migrations_history"))
             .UseSnakeCaseNamingConvention()
-            .AddInterceptors(sp.GetRequiredService<TenantStampInterceptor>()));
+            .AddInterceptors(sp.GetRequiredService<TenantStampInterceptor>(), sp.GetRequiredService<DomainEventsToOutboxInterceptor>()));
 
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<FlorunaDbContext>());
         services.AddScoped<ITenantRepository, TenantRepository>();
@@ -108,7 +120,27 @@ public static class DependencyInjection
         services.AddScoped<IInventoryRepository, InventoryRepository>();
         services.AddScoped<IInventoryQueries, InventoryQueries>();
         services.AddSingleton<ReservationExpiryJob>();
+
+        // Checkout, pedidos, cupons, entrega e a outbox (com o processador e o job de abandonados).
+        services.AddScoped<ICouponRepository, CouponRepository>();
+        services.AddScoped<IDeliveryRepository, DeliveryRepository>();
+        services.AddScoped<IOrderRepository, OrderRepository>();
+        services.AddScoped<CommerceQueries>();
+        services.AddScoped<ICouponQueries>(sp => sp.GetRequiredService<CommerceQueries>());
+        services.AddScoped<IDeliveryQueries>(sp => sp.GetRequiredService<CommerceQueries>());
+        services.AddScoped<IOrderQueries>(sp => sp.GetRequiredService<CommerceQueries>());
+        services.AddScoped<IOutboxAdmin, OutboxAdmin>();
+        services.AddSingleton<OutboxProcessor>();
+        services.AddSingleton<AbandonedOrdersJob>();
+
+        // Papel do processo (Bulkhead): com BackgroundJobs:Enabled=false o processo só atende
+        // HTTP. Em produção, a MESMA imagem roda como "api" (jobs desligados) e como
+        // "worker" (jobs ligados), escalando separadamente (dívida M5 do Nest). Os testes
+        // desligam e disparam cada ciclo explicitamente, de forma determinística.
+        // A opção é lida quando o job INICIA (não aqui): a configuração final só existe depois do Build.
         services.AddHostedService(sp => sp.GetRequiredService<ReservationExpiryJob>());
+        services.AddHostedService(sp => sp.GetRequiredService<OutboxProcessor>());
+        services.AddHostedService(sp => sp.GetRequiredService<AbandonedOrdersJob>());
 
         services.AddHealthChecks().AddDbContextCheck<FlorunaDbContext>(DatabaseHealthCheckName, tags: ["ready"]);
     }

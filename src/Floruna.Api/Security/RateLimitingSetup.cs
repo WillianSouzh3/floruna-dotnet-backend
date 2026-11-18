@@ -13,6 +13,12 @@ public sealed class RateLimitingSettings
     public int AuthPermitLimit { get; set; } = 5;
 
     public TimeSpan AuthWindow { get; set; } = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// Checkout: teto mais alto (compradores atrás do mesmo NAT de escritório/operadora)
+    /// sem deixar a rota aberta a robôs.
+    /// </summary>
+    public int CheckoutPermitLimit { get; set; } = 30;
 }
 
 /// <summary>
@@ -27,6 +33,7 @@ public sealed class RateLimitingSettings
 internal static class RateLimitingSetup
 {
     public const string AuthPolicy = "auth";
+    public const string CheckoutPolicy = "checkout";
 
     public static IServiceCollection AddFlorunaRateLimiting(this IServiceCollection services, IConfiguration configuration)
     {
@@ -50,6 +57,18 @@ internal static class RateLimitingSetup
                 {
                     PermitLimit = settings.AuthPermitLimit,
                     Window = settings.AuthWindow,
+                    QueueLimit = 0,
+                });
+            });
+
+            options.AddPolicy(CheckoutPolicy, http =>
+            {
+                var settings = http.RequestServices.GetRequiredService<IOptions<RateLimitingSettings>>().Value;
+                var key = $"{http.Request.Headers["x-tenant-host"]}|{http.Connection.RemoteIpAddress}";
+                return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = settings.CheckoutPermitLimit,
+                    Window = TimeSpan.FromMinutes(1),
                     QueueLimit = 0,
                 });
             });

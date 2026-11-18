@@ -1,6 +1,7 @@
 using Floruna.Domain.Catalog;
 using Floruna.Domain.Customers;
 using Floruna.Domain.Identity;
+using Floruna.Domain.Ordering;
 using Floruna.SharedKernel;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
@@ -21,3 +22,5 @@ internal sealed class CategoryIdConverter() : ValueConverter<CategoryId, Guid>(i
 internal sealed class CollectionIdConverter() : ValueConverter<CollectionId, Guid>(id => id.Value, value => new CollectionId(value));
 
 internal sealed class VariantIdConverter() : ValueConverter<VariantId, string>(id => id.Value, value => new VariantId(value));
+
+internal sealed class OrderIdConverter() : ValueConverter<OrderId, Guid>(id => id.Value, value => new OrderId(value));

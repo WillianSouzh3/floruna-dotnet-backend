@@ -67,6 +67,13 @@ docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 dotnet 
 | GET · POST · PATCH · DELETE | `/api/v1/categories/manage`, `/categories/{id}`, `/collections/manage`, `/collections/{id}`, `PUT /collections/{id}/products` | admin |
 | GET | `/api/v1/stock/low` · `/low/count` · `/expiring?days=7` · `/reservations` · `/{productId}/movements` · `/{productId}/lots` | admin |
 | POST | `/api/v1/stock/{productId}/restock` · `/adjust` · `/loss` · `/reservations/{id}/release` | admin |
+| POST | `/api/v1/orders` (checkout; login opcional) · GET `/orders/{id}?token=` | público (rate-limited) |
+| GET | `/api/v1/orders` (filtros: `status`, `search`, `minTotal`, `maxTotal`) · PATCH `/orders/{id}/status` | admin |
+| GET | `/api/v1/orders/me` | cliente |
+| GET · POST · PUT · DELETE | `/api/v1/coupons` · GET `/coupons/validate?code=&subtotal=&email=` (público) | admin |
+| GET · POST · PUT · DELETE | `/api/v1/delivery-zones` · GET `/delivery-zones/quote?cep=` (público) | admin |
+| GET · POST · PATCH · DELETE | `/api/v1/delivery-capacity` · POST `/delivery-promises/quote` (público) | admin |
+| GET · POST | `/api/v1/platform/outbox?state=dead` · `/platform/outbox/{id}/retry` | superadmin |
 | GET | `/api/v1/health`, `/health/live`, `/health/ready` | público |
 
 A loja vem do header `x-tenant-host` (enviado pelo BFF) ou do `Host`: `flora-lis.localhost:3000` → loja `flora-lis`.
@@ -93,6 +100,7 @@ curl -X POST localhost:4000/api/v1/auth/admin/login -H 'x-tenant-host: flora-lis
 | `Network:TrustedProxies` | `Network__TrustedProxies__0` | `10.0.0.0/16` (VPC do ALB) |
 | `Seed:SuperAdminEmail` / `SuperAdminPassword` | `Seed__SuperAdminEmail` | superadmin de dev |
 | `Cors:AllowedOrigins` | `Cors__AllowedOrigins__0` | `http://localhost:3000` |
+| `BackgroundJobs:Enabled` | `BackgroundJobs__Enabled` | `false` = processo só HTTP (papel api) |
 | `GIT_SHA` | `GIT_SHA` | SHA do commit (preenchido pelo CI na imagem) |
 
 Configuração inválida impede a API de subir (fail-fast).
@@ -105,7 +113,7 @@ Configuração inválida impede a API de subir (fail-fast).
 | 1 | Plataforma + Identity: tenant por host, filtro fail-closed, JWT compatível, planos, 2FA, bloqueio, reset de senha, equipe, superadmin, domínio próprio | ✅ |
 | 2 | Catálogo: produtos com variações, categorias, coleções com janela, cache da vitrine, limites do plano | ✅ |
 | 3 | Estoque: lotes com validade, FEFO, ledger append-only, reservas com expiração, concorrência com trava de linha | ✅ |
-| 4 | Checkout + Pedido + Outbox | |
+| 4 | Checkout + Pedido + Outbox: cupons, zonas e capacidade de entrega, checkout transacional e idempotente, estados, abandonados, outbox com DLQ | ✅ |
 | 5 | Pagamentos (PIX, Mercado Pago) | |
 | 6 | Fidelidade, oficinas, PDV, orçamentos | |
 | 7 | Produção na AWS (ECS Fargate, RDS, Secrets Manager, CDK) | |

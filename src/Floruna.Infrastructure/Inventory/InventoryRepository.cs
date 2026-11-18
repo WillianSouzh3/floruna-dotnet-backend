@@ -46,6 +46,18 @@ internal sealed class InventoryRepository(FlorunaDbContext db, ITenantContext te
     public Task<StockReservation?> FindReservationByKeyAsync(string idempotencyKey, CancellationToken cancellationToken) =>
         db.StockReservations.FirstOrDefaultAsync(r => r.IdempotencyKey == idempotencyKey, cancellationToken);
 
+    public async Task<StockReservation?> GetReservationByKeyForUpdateAsync(string idempotencyKey, CancellationToken cancellationToken)
+    {
+        EnsureTransaction();
+        var tenant = tenantContext.RequiredTenantId.Value;
+        await db.Database.ExecuteSqlAsync(
+            $"SELECT 1 FROM stock_reservations WHERE idempotency_key = {idempotencyKey} AND tenant_id = {tenant} FOR UPDATE", cancellationToken);
+        return await db.StockReservations.FirstOrDefaultAsync(r => r.IdempotencyKey == idempotencyKey, cancellationToken);
+    }
+
+    public Task<bool> MovementExistsAsync(string idempotencyKey, CancellationToken cancellationToken) =>
+        db.StockMovements.AnyAsync(m => m.IdempotencyKey == idempotencyKey, cancellationToken);
+
     private void EnsureTransaction()
     {
         if (db.Database.CurrentTransaction is null)

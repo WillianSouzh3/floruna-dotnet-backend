@@ -4,7 +4,11 @@ using Floruna.SharedKernel;
 namespace Floruna.Application.Abstractions;
 
 /// <summary>Fotografia da loja resolvida para a requisição (vem do cache, não do banco a cada request).</summary>
-public sealed record ResolvedTenant(TenantId Id, string Slug, TenantStatus Status, TenantPlan EffectivePlan);
+/// <param name="TimeZone">Fuso IANA da loja: datas e janelas de entrega são no horário LOCAL dela (RN-50).</param>
+public sealed record ResolvedTenant(TenantId Id, string Slug, TenantStatus Status, TenantPlan EffectivePlan, string TimeZone = "America/Sao_Paulo")
+{
+    public TimeZoneInfo TimeZoneInfo => TimeZoneInfo.FindSystemTimeZoneById(TimeZone);
+}
 
 /// <summary>
 /// A loja da requisição atual. Equivale ao AsyncLocalStorage do Nest

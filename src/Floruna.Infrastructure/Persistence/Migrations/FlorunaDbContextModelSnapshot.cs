@@ -346,6 +346,110 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                     b.ToTable("customers", (string)null);
                 });
 
+            modelBuilder.Entity("Floruna.Domain.Delivery.CapacityRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Capacity")
+                        .HasColumnType("integer")
+                        .HasColumnName("capacity");
+
+                    b.Property<int>("CutoffMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("cutoff_minutes");
+
+                    b.Property<DateOnly?>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("note");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<int?>("Weekday")
+                        .HasColumnType("integer")
+                        .HasColumnName("weekday");
+
+                    b.Property<string>("Window")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("window");
+
+                    b.Property<Guid?>("ZoneId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("zone_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_delivery_capacity_rules");
+
+                    b.HasIndex("TenantId", "Kind", "Date", "Weekday")
+                        .HasDatabaseName("ix_delivery_capacity_rules_tenant_id_kind_date_weekday");
+
+                    b.ToTable("delivery_capacity_rules", (string)null);
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Delivery.DeliveryZone", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("FeeCents")
+                        .HasColumnType("bigint")
+                        .HasColumnName("fee_cents");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<int>("ZipEnd")
+                        .HasColumnType("integer")
+                        .HasColumnName("zip_end");
+
+                    b.Property<int>("ZipStart")
+                        .HasColumnType("integer")
+                        .HasColumnName("zip_start");
+
+                    b.HasKey("Id")
+                        .HasName("pk_delivery_zones");
+
+                    b.HasIndex("TenantId", "IsActive", "ZipStart", "ZipEnd")
+                        .HasDatabaseName("ix_delivery_zones_tenant_id_is_active_zip_start_zip_end");
+
+                    b.ToTable("delivery_zones", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_delivery_zones_range", "zip_start <= zip_end");
+                        });
+                });
+
             modelBuilder.Entity("Floruna.Domain.Identity.SingleUseToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -704,6 +808,133 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Floruna.Domain.Ordering.Order", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AccessTokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("access_token_hash");
+
+                    b.Property<string>("CouponCode")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("coupon_code");
+
+                    b.Property<Guid?>("CouponId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("coupon_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_id");
+
+                    b.Property<DateOnly?>("DeliveryDate")
+                        .HasColumnType("date")
+                        .HasColumnName("delivery_date");
+
+                    b.Property<long>("DeliveryFeeCents")
+                        .HasColumnType("bigint")
+                        .HasColumnName("delivery_fee_cents");
+
+                    b.Property<string>("DeliveryMethod")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("delivery_method");
+
+                    b.Property<Guid?>("DeliverySlotScope")
+                        .HasColumnType("uuid")
+                        .HasColumnName("delivery_slot_scope");
+
+                    b.Property<string>("DeliveryWindow")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("delivery_window");
+
+                    b.Property<Guid?>("DeliveryZoneId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("delivery_zone_id");
+
+                    b.Property<long>("DiscountCents")
+                        .HasColumnType("bigint")
+                        .HasColumnName("discount_cents");
+
+                    b.Property<long>("GiftCardFeeCents")
+                        .HasColumnType("bigint")
+                        .HasColumnName("gift_card_fee_cents");
+
+                    b.Property<string>("IdempotencyKey")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<DateTimeOffset>("PaymentDeadline")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("payment_deadline");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("SubstitutionMode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("substitution_mode");
+
+                    b.Property<long>("SubtotalCents")
+                        .HasColumnType("bigint")
+                        .HasColumnName("subtotal_cents");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<long>("TotalCents")
+                        .HasColumnType("bigint")
+                        .HasColumnName("total_cents");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_orders");
+
+                    b.HasIndex("PaymentDeadline")
+                        .HasDatabaseName("ix_orders_pending_payment_deadline")
+                        .HasFilter("status = 'Pendente'");
+
+                    b.HasIndex("TenantId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_orders_tenant_id_idempotency_key")
+                        .HasFilter("idempotency_key IS NOT NULL");
+
+                    b.HasIndex("TenantId", "CustomerId", "CreatedAt")
+                        .HasDatabaseName("ix_orders_tenant_id_customer_id_created_at");
+
+                    b.HasIndex("TenantId", "Status", "CreatedAt")
+                        .HasDatabaseName("ix_orders_tenant_id_status_created_at");
+
+                    b.ToTable("orders", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_orders_discount_within_items", "discount_cents <= subtotal_cents");
+
+                            t.HasCheckConstraint("ck_orders_total_positive", "total_cents > 0");
+                        });
+                });
+
             modelBuilder.Entity("Floruna.Domain.Platform.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -806,6 +1037,254 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_tenants_slug");
 
                     b.ToTable("tenants", (string)null);
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Promotions.Coupon", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<int?>("MaxUses")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_uses");
+
+                    b.Property<long>("MinOrderCents")
+                        .HasColumnType("bigint")
+                        .HasColumnName("min_order_cents");
+
+                    b.Property<int?>("PerCustomerLimit")
+                        .HasColumnType("integer")
+                        .HasColumnName("per_customer_limit");
+
+                    b.Property<string>("TargetEmail")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("target_email");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("type");
+
+                    b.Property<int>("UsedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("used_count");
+
+                    b.Property<long>("Value")
+                        .HasColumnType("bigint")
+                        .HasColumnName("value");
+
+                    b.HasKey("Id")
+                        .HasName("pk_coupons");
+
+                    b.HasIndex("TenantId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_coupons_tenant_id_code");
+
+                    b.ToTable("coupons", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_coupons_used_within_limit", "max_uses IS NULL OR used_count <= max_uses");
+                        });
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Promotions.CouponRedemption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("code");
+
+                    b.Property<Guid>("CouponId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("coupon_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long>("DiscountCents")
+                        .HasColumnType("bigint")
+                        .HasColumnName("discount_cents");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("email");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<long>("OrderTotalCents")
+                        .HasColumnType("bigint")
+                        .HasColumnName("order_total_cents");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_coupon_redemptions");
+
+                    b.HasIndex("CouponId")
+                        .HasDatabaseName("ix_coupon_redemptions_coupon_id");
+
+                    b.HasIndex("TenantId", "OrderId")
+                        .HasDatabaseName("ix_coupon_redemptions_tenant_id_order_id");
+
+                    b.HasIndex("TenantId", "CouponId", "Email")
+                        .HasDatabaseName("ix_coupon_redemptions_tenant_id_coupon_id_email");
+
+                    b.ToTable("coupon_redemptions", (string)null);
+                });
+
+            modelBuilder.Entity("Floruna.Infrastructure.Outbox.OutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTimeOffset?>("LockedUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("locked_until");
+
+                    b.Property<DateTimeOffset>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload");
+
+                    b.Property<DateTimeOffset?>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("processed_at");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("state");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_outbox_messages");
+
+                    b.HasIndex("State", "NextAttemptAt")
+                        .HasDatabaseName("ix_outbox_messages_state_next_attempt_at")
+                        .HasFilter("state IN ('Pending', 'Processing')");
+
+                    b.HasIndex("TenantId", "OccurredAt")
+                        .HasDatabaseName("ix_outbox_messages_tenant_id_occurred_at");
+
+                    b.ToTable("outbox_messages", (string)null);
+                });
+
+            modelBuilder.Entity("Floruna.Infrastructure.Outbox.OutboxReceipt", b =>
+                {
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("message_id");
+
+                    b.Property<string>("Handler")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("handler");
+
+                    b.Property<DateTimeOffset>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("processed_at");
+
+                    b.HasKey("MessageId", "Handler")
+                        .HasName("pk_outbox_receipts");
+
+                    b.ToTable("outbox_receipts", (string)null);
+                });
+
+            modelBuilder.Entity("Floruna.Infrastructure.Persistence.Configurations.DeliverySlotUsage", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<string>("Window")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("window");
+
+                    b.Property<Guid>("ZoneKey")
+                        .HasColumnType("uuid")
+                        .HasColumnName("zone_key");
+
+                    b.Property<int>("Used")
+                        .HasColumnType("integer")
+                        .HasColumnName("used");
+
+                    b.HasKey("TenantId", "Date", "Window", "ZoneKey")
+                        .HasName("pk_delivery_slot_usage");
+
+                    b.ToTable("delivery_slot_usage", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_delivery_slot_usage_used", "used >= 0");
+                        });
                 });
 
             modelBuilder.Entity("Floruna.Infrastructure.Security.LoginAttemptBucket", b =>
@@ -998,6 +1477,26 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_customers_tenants_tenant_id");
                 });
 
+            modelBuilder.Entity("Floruna.Domain.Delivery.CapacityRule", b =>
+                {
+                    b.HasOne("Floruna.Domain.Platform.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_delivery_capacity_rules_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Delivery.DeliveryZone", b =>
+                {
+                    b.HasOne("Floruna.Domain.Platform.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_delivery_zones_tenants_tenant_id");
+                });
+
             modelBuilder.Entity("Floruna.Domain.Identity.SingleUseToken", b =>
                 {
                     b.HasOne("Floruna.Domain.Platform.Tenant", null)
@@ -1087,6 +1586,220 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_stock_reservations_stock_items_product_id");
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Ordering.Order", b =>
+                {
+                    b.HasOne("Floruna.Domain.Platform.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_orders_tenants_tenant_id");
+
+                    b.OwnsOne("Floruna.Domain.Ordering.CustomerContact", "Customer", b1 =>
+                        {
+                            b1.Property<Guid>("OrderId");
+
+                            b1.Property<string>("Email");
+
+                            b1.Property<string>("Name")
+                                .IsRequired();
+
+                            b1.Property<string>("Phone")
+                                .IsRequired();
+
+                            b1.HasKey("OrderId");
+
+                            b1.ToTable("orders");
+
+                            b1
+                                .ToJson("customer")
+                                .HasColumnType("jsonb");
+
+                            b1.WithOwner()
+                                .HasForeignKey("OrderId")
+                                .HasConstraintName("fk_orders_orders_id");
+                        });
+
+                    b.OwnsOne("Floruna.Domain.Ordering.DeliveryAddress", "Address", b1 =>
+                        {
+                            b1.Property<Guid>("OrderId");
+
+                            b1.Property<string>("City")
+                                .IsRequired();
+
+                            b1.Property<string>("Complement")
+                                .IsRequired();
+
+                            b1.Property<string>("DeliveryNotes")
+                                .IsRequired();
+
+                            b1.Property<string>("Neighborhood")
+                                .IsRequired();
+
+                            b1.Property<string>("Number")
+                                .IsRequired();
+
+                            b1.Property<string>("RecipientName")
+                                .IsRequired();
+
+                            b1.Property<string>("State")
+                                .IsRequired();
+
+                            b1.Property<string>("Street")
+                                .IsRequired();
+
+                            b1.Property<string>("ZipCode")
+                                .IsRequired();
+
+                            b1.HasKey("OrderId");
+
+                            b1.ToTable("orders");
+
+                            b1
+                                .ToJson("address")
+                                .HasColumnType("jsonb");
+
+                            b1.WithOwner()
+                                .HasForeignKey("OrderId")
+                                .HasConstraintName("fk_orders_orders_id");
+                        });
+
+                    b.OwnsOne("Floruna.Domain.Ordering.GiftCard", "GiftCard", b1 =>
+                        {
+                            b1.Property<Guid>("OrderId");
+
+                            b1.Property<string>("From")
+                                .IsRequired();
+
+                            b1.Property<string>("Message")
+                                .IsRequired();
+
+                            b1.Property<string>("To")
+                                .IsRequired();
+
+                            b1.HasKey("OrderId");
+
+                            b1.ToTable("orders");
+
+                            b1
+                                .ToJson("gift_card")
+                                .HasColumnType("jsonb");
+
+                            b1.WithOwner()
+                                .HasForeignKey("OrderId")
+                                .HasConstraintName("fk_orders_orders_id");
+                        });
+
+                    b.OwnsMany("Floruna.Domain.Ordering.OrderItem", "Items", b1 =>
+                        {
+                            b1.Property<Guid>("OrderId");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAdd();
+
+                            b1.Property<string>("Name")
+                                .IsRequired();
+
+                            b1.Property<Guid>("ProductId");
+
+                            b1.Property<int>("Quantity");
+
+                            b1.Property<string>("Sku");
+
+                            b1.Property<long>("UnitCostCents");
+
+                            b1.Property<long>("UnitPriceCents");
+
+                            b1.Property<string>("VariantId");
+
+                            b1.Property<string>("VariantLabel");
+
+                            b1.HasKey("OrderId", "__synthesizedOrdinal")
+                                .HasName("pk_orders");
+
+                            b1.ToTable("orders");
+
+                            b1
+                                .ToJson("items")
+                                .HasColumnType("jsonb");
+
+                            b1.WithOwner()
+                                .HasForeignKey("OrderId")
+                                .HasConstraintName("fk_orders_orders_order_id");
+                        });
+
+                    b.OwnsMany("Floruna.Domain.Ordering.StatusChange", "History", b1 =>
+                        {
+                            b1.Property<Guid>("OrderId");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAdd();
+
+                            b1.Property<Guid?>("ActorId");
+
+                            b1.Property<string>("ActorRole")
+                                .IsRequired();
+
+                            b1.Property<DateTimeOffset>("At");
+
+                            b1.Property<string>("From")
+                                .HasMaxLength(32);
+
+                            b1.Property<string>("IdempotencyKey");
+
+                            b1.Property<string>("Reason")
+                                .IsRequired();
+
+                            b1.Property<string>("To")
+                                .IsRequired()
+                                .HasMaxLength(32);
+
+                            b1.HasKey("OrderId", "__synthesizedOrdinal")
+                                .HasName("pk_orders");
+
+                            b1.ToTable("orders");
+
+                            b1
+                                .ToJson("status_history")
+                                .HasColumnType("jsonb");
+
+                            b1.WithOwner()
+                                .HasForeignKey("OrderId")
+                                .HasConstraintName("fk_orders_orders_order_id");
+                        });
+
+                    b.Navigation("Address");
+
+                    b.Navigation("Customer")
+                        .IsRequired();
+
+                    b.Navigation("GiftCard");
+
+                    b.Navigation("History");
+
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Promotions.Coupon", b =>
+                {
+                    b.HasOne("Floruna.Domain.Platform.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_coupons_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Promotions.CouponRedemption", b =>
+                {
+                    b.HasOne("Floruna.Domain.Promotions.Coupon", null)
+                        .WithMany()
+                        .HasForeignKey("CouponId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_coupon_redemptions_coupons_coupon_id");
                 });
 
             modelBuilder.Entity("Floruna.Domain.Inventory.StockItem", b =>

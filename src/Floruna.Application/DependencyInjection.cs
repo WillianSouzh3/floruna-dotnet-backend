@@ -36,6 +36,9 @@ public static class DependencyInjection
         services.AddScoped<TenantContext>();
         services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<TenantContext>());
 
+        // Serviço de aplicação compartilhado entre a cotação de entrega e o checkout.
+        services.AddScoped<Delivery.DeliveryResolver>();
+
         return services;
     }
 }

@@ -111,7 +111,7 @@ internal sealed partial class TenantHostResolver(
 
         return tenant is null
             ? null
-            : new ResolvedTenant(tenant.Id, tenant.Slug.Value, tenant.Status, tenant.EffectivePlan(clock.GetUtcNow()));
+            : new ResolvedTenant(tenant.Id, tenant.Slug.Value, tenant.Status, tenant.EffectivePlan(clock.GetUtcNow()), tenant.TimeZone);
     }
 
     /// <summary>

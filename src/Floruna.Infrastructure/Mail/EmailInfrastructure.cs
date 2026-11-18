@@ -106,3 +106,11 @@ internal sealed partial class EmailDispatcher(BackgroundEmailQueue queue, IEmail
     [LoggerMessage(Level = LogLevel.Error, Message = "Falha ao enviar e-mail \"{Subject}\"")]
     private static partial void LogFailed(ILogger logger, Exception exception, string subject);
 }
+
+/// <summary>Entrega SÍNCRONA (para os handlers da outbox): a exceção do SMTP volta para a outbox, que repete.</summary>
+internal sealed class SmtpEmailDelivery(IEmailTransport transport) : IEmailDelivery
+{
+    public bool IsEnabled => transport.IsConfigured;
+
+    public Task DeliverAsync(EmailMessage message, CancellationToken cancellationToken) => transport.DeliverAsync(message, cancellationToken);
+}

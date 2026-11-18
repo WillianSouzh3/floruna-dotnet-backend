@@ -43,6 +43,18 @@ public interface IEmailSender
     ValueTask SendAsync(EmailMessage message, CancellationToken cancellationToken);
 }
 
+/// <summary>
+/// Entrega SÍNCRONA de e-mail (lança exceção se o SMTP falhar). Usada pelos handlers
+/// da outbox: a falha volta para a outbox, que tenta de novo com backoff. Diferente do
+/// <see cref="IEmailSender"/> (fila em memória, sem garantia).
+/// </summary>
+public interface IEmailDelivery
+{
+    bool IsEnabled { get; }
+
+    Task DeliverAsync(EmailMessage message, CancellationToken cancellationToken);
+}
+
 public enum TxtLookupStatus
 {
     Found = 0,
