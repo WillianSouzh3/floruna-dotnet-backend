@@ -19,7 +19,7 @@ fechado. O front Next.js precisa continuar validando a sessão (`proxy.ts`, `jos
 3. **Cadastro de loja numa transação** (loja + usuário master no mesmo `SaveChanges`).
    O Nest criava em dois passos com compensação manual.
 4. **JWT HS256 com os claims do Nest** (`sub, email, name, role, tenantId, sessionVersion, locale`).
-   Verificado com `jose` e `jsonwebtoken`-style signing em Node, nos dois sentidos.
+   Verificado com `jose` (a biblioteca do `proxy.ts`) em Node, nos dois sentidos.
 5. **BCrypt custo 10** (`BCrypt.Net-Next`), compatível com `bcryptjs`: senhas migradas funcionam.
 6. **Autorização segura por padrão**: `MapControllers().RequireAuthorization()`; rotas públicas usam `[AllowAnonymous]`.
 7. **Recurso por plano** via `[RequiresPlanFeature]` (`IAuthorizationRequirementData`), código `PLAN_UPGRADE_REQUIRED`.
