@@ -17,7 +17,7 @@ public sealed class CreateProductHandlerTests
     private ProductCommandHandlers Handler(TenantPlan plan)
     {
         _tenant.Set(new ResolvedTenant(TenantId.New(), "loja", TenantStatus.Active, plan));
-        return new ProductCommandHandlers(_tenant, _catalog, Substitute.For<ICatalogQueries>(), Substitute.For<ICatalogCache>(),
+        return new ProductCommandHandlers(_tenant, _catalog, Substitute.For<Floruna.Domain.Inventory.IInventoryRepository>(), Substitute.For<ICatalogQueries>(), Substitute.For<ICatalogCache>(),
             _unitOfWork, new FakeTimeProvider());
     }
 

@@ -262,10 +262,6 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(60)")
                         .HasColumnName("slug");
 
-                    b.Property<int>("Stock")
-                        .HasColumnType("integer")
-                        .HasColumnName("stock");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
@@ -299,8 +295,6 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_products_discount_below_price", "discount_price_cents IS NULL OR discount_price_cents < price_cents");
 
                             t.HasCheckConstraint("ck_products_price_positive", "price_cents > 0");
-
-                            t.HasCheckConstraint("ck_products_stock_non_negative", "stock >= 0");
                         });
                 });
 
@@ -461,6 +455,253 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_staff_users_tenant_id_email");
 
                     b.ToTable("staff_users", (string)null);
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Inventory.StockItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<int>("OnHand")
+                        .HasColumnType("integer")
+                        .HasColumnName("on_hand");
+
+                    b.Property<int>("Reserved")
+                        .HasColumnType("integer")
+                        .HasColumnName("reserved");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stock_items");
+
+                    b.ToTable("stock_items", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_stock_items_on_hand_non_negative", "on_hand >= 0");
+
+                            t.HasCheckConstraint("ck_stock_items_reserved_valid", "reserved >= 0 AND reserved <= on_hand");
+                        });
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Inventory.StockLot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<int>("InitialQuantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("initial_quantity");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("note");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.Property<string>("ReceivedBy")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("received_by");
+
+                    b.Property<int>("Remaining")
+                        .HasColumnType("integer")
+                        .HasColumnName("remaining");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<long?>("UnitCostCents")
+                        .HasColumnType("bigint")
+                        .HasColumnName("unit_cost_cents");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stock_lots");
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("ix_stock_lots_product_id");
+
+                    b.HasIndex("TenantId", "ExpiresAt")
+                        .HasDatabaseName("ix_stock_lots_tenant_id_expires_at")
+                        .HasFilter("remaining > 0 AND expires_at IS NOT NULL");
+
+                    b.HasIndex("TenantId", "ProductId", "ExpiresAt")
+                        .HasDatabaseName("ix_stock_lots_tenant_id_product_id_expires_at")
+                        .HasFilter("remaining > 0");
+
+                    b.ToTable("stock_lots", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_stock_lots_remaining_valid", "remaining >= 0 AND remaining <= initial_quantity");
+                        });
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Inventory.StockMovement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("By")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("by");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("Delta")
+                        .HasColumnType("integer")
+                        .HasColumnName("delta");
+
+                    b.Property<string>("IdempotencyKey")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("note");
+
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("product_name");
+
+                    b.Property<int>("ResultingStock")
+                        .HasColumnType("integer")
+                        .HasColumnName("resulting_stock");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stock_movements");
+
+                    b.HasIndex("TenantId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_stock_movements_tenant_id_idempotency_key")
+                        .HasFilter("idempotency_key IS NOT NULL");
+
+                    b.HasIndex("TenantId", "ProductId", "CreatedAt")
+                        .HasDatabaseName("ix_stock_movements_tenant_id_product_id_created_at");
+
+                    b.ToTable("stock_movements", (string)null);
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Inventory.StockReservation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("note");
+
+                    b.Property<string>("OwnerId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("owner_id");
+
+                    b.Property<string>("OwnerType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("owner_type");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity");
+
+                    b.Property<DateTimeOffset?>("SettledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("settled_at");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("state");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stock_reservations");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("ix_stock_reservations_held_expires_at")
+                        .HasFilter("state = 'Held'");
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("ix_stock_reservations_product_id");
+
+                    b.HasIndex("TenantId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_stock_reservations_tenant_id_idempotency_key");
+
+                    b.HasIndex("TenantId", "OwnerType", "OwnerId")
+                        .HasDatabaseName("ix_stock_reservations_tenant_id_owner_type_owner_id");
+
+                    b.ToTable("stock_reservations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_stock_reservations_quantity_positive", "quantity > 0");
+                        });
                 });
 
             modelBuilder.Entity("Floruna.Domain.Platform.Tenant", b =>
@@ -782,6 +1023,75 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_staff_users_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Inventory.StockItem", b =>
+                {
+                    b.HasOne("Floruna.Domain.Catalog.Product", null)
+                        .WithOne()
+                        .HasForeignKey("Floruna.Domain.Inventory.StockItem", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_stock_items_products_product_id");
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Inventory.StockLot", b =>
+                {
+                    b.HasOne("Floruna.Domain.Inventory.StockItem", null)
+                        .WithMany("Lots")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_stock_lots_stock_items_product_id");
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Inventory.StockMovement", b =>
+                {
+                    b.OwnsMany("Floruna.Domain.Inventory.StockMovementLot", "Lots", b1 =>
+                        {
+                            b1.Property<Guid>("movement_id")
+                                .HasColumnType("uuid")
+                                .HasColumnName("movement_id");
+
+                            b1.Property<Guid>("LotId")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("uuid")
+                                .HasColumnName("lot_id");
+
+                            b1.Property<int>("Quantity")
+                                .HasColumnType("integer")
+                                .HasColumnName("quantity");
+
+                            b1.Property<long?>("UnitCostCents")
+                                .HasColumnType("bigint")
+                                .HasColumnName("unit_cost_cents");
+
+                            b1.HasKey("movement_id", "LotId")
+                                .HasName("pk_stock_movement_lots");
+
+                            b1.ToTable("stock_movement_lots", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("movement_id")
+                                .HasConstraintName("fk_stock_movement_lots_stock_movements_movement_id");
+                        });
+
+                    b.Navigation("Lots");
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Inventory.StockReservation", b =>
+                {
+                    b.HasOne("Floruna.Domain.Inventory.StockItem", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_stock_reservations_stock_items_product_id");
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Inventory.StockItem", b =>
+                {
+                    b.Navigation("Lots");
                 });
 #pragma warning restore 612, 618
         }

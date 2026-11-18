@@ -65,6 +65,8 @@ docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 dotnet 
 | POST · PUT · DELETE | `/api/v1/products`, `/products/{id}` | admin |
 | GET | `/api/v1/categories` · `/collections` · `/collections/slug/{slug}` | público |
 | GET · POST · PATCH · DELETE | `/api/v1/categories/manage`, `/categories/{id}`, `/collections/manage`, `/collections/{id}`, `PUT /collections/{id}/products` | admin |
+| GET | `/api/v1/stock/low` · `/low/count` · `/expiring?days=7` · `/reservations` · `/{productId}/movements` · `/{productId}/lots` | admin |
+| POST | `/api/v1/stock/{productId}/restock` · `/adjust` · `/loss` · `/reservations/{id}/release` | admin |
 | GET | `/api/v1/health`, `/health/live`, `/health/ready` | público |
 
 A loja vem do header `x-tenant-host` (enviado pelo BFF) ou do `Host`: `flora-lis.localhost:3000` → loja `flora-lis`.
@@ -102,7 +104,7 @@ Configuração inválida impede a API de subir (fail-fast).
 | 0 | Fundação: solution, mediator, envelope, Options, health, CI, testes de arquitetura | ✅ |
 | 1 | Plataforma + Identity: tenant por host, filtro fail-closed, JWT compatível, planos, 2FA, bloqueio, reset de senha, equipe, superadmin, domínio próprio | ✅ |
 | 2 | Catálogo: produtos com variações, categorias, coleções com janela, cache da vitrine, limites do plano | ✅ |
-| 3 | Estoque (lotes FEFO, ledger, reservas) | |
+| 3 | Estoque: lotes com validade, FEFO, ledger append-only, reservas com expiração, concorrência com trava de linha | ✅ |
 | 4 | Checkout + Pedido + Outbox | |
 | 5 | Pagamentos (PIX, Mercado Pago) | |
 | 6 | Fidelidade, oficinas, PDV, orçamentos | |

@@ -1,6 +1,7 @@
 using Floruna.Application.Abstractions;
 using Floruna.Application.Messaging;
 using Floruna.Domain.Catalog;
+using Floruna.Domain.Inventory;
 using Floruna.Domain.Platform;
 using Floruna.SharedKernel;
 using FluentValidation;
@@ -101,6 +102,7 @@ internal sealed class UpdateProductValidator : AbstractValidator<UpdateProductCo
 internal sealed class ProductCommandHandlers(
     ITenantContext tenantContext,
     ICatalogRepository catalog,
+    IInventoryRepository inventory,
     ICatalogQueries queries,
     ICatalogCache cache,
     IUnitOfWork unitOfWork,
@@ -124,13 +126,25 @@ internal sealed class ProductCommandHandlers(
             return draft.Error;
         }
 
-        var created = Product.Create(tenant.Id, draft.Value, clock.GetUtcNow());
+        var now = clock.GetUtcNow();
+        var created = Product.Create(tenant.Id, draft.Value, now);
         if (created.IsFailure)
         {
             return created.Error;
         }
 
         catalog.Add(created.Value);
+
+        // Todo produto nasce com o seu estoque. O "estoque inicial" do formulário vira
+        // um LOTE + um movimento opening_balance no ledger: nada aparece do nada.
+        var item = StockItem.Open(created.Value.Id, tenant.Id);
+        inventory.Add(item);
+        if (request.Input.Stock is > 0 and var initial)
+        {
+            var change = item.Receive(initial, null, created.Value.CostCents, "Estoque inicial", "cadastro", now, StockMovementType.OpeningBalance);
+            inventory.Add(StockMovement.Record(tenant.Id, created.Value.Id, created.Value.Name, change, "Estoque inicial", "cadastro", now));
+        }
+
         return await SaveAndReadAsync(created.Value, cancellationToken);
     }
 
@@ -148,8 +162,55 @@ internal sealed class ProductCommandHandlers(
             return draft.Error;
         }
 
-        var updated = product.Update(draft.Value, clock.GetUtcNow());
-        return updated.IsFailure ? updated.Error : await SaveAndReadAsync(product, cancellationToken);
+        var now = clock.GetUtcNow();
+        var updated = product.Update(draft.Value, now);
+        if (updated.IsFailure)
+        {
+            return updated.Error;
+        }
+
+        if (request.Input.Stock is not { } target)
+        {
+            return await SaveAndReadAsync(product, cancellationToken);
+        }
+
+        // O formulário mandou um número de estoque: no Nest isso SOBRESCREVIA o campo,
+        // sem rastro. Aqui vira um AJUSTE no ledger (diferença entre o desejado e o atual),
+        // com o estoque travado para não brigar com uma venda simultânea.
+        Result adjusted;
+        try
+        {
+            adjusted = await unitOfWork.ExecuteInTransactionAsync(async ct =>
+        {
+            var item = await inventory.GetForUpdateAsync(product.Id, ct);
+            if (item is null)
+            {
+                item = StockItem.Open(product.Id, product.TenantId);
+                inventory.Add(item);
+            }
+
+            var delta = target - item.OnHand;
+            if (delta != 0)
+            {
+                var change = item.Adjust(delta, "Ajuste pelo cadastro do produto", "cadastro", now);
+                if (change.IsFailure)
+                {
+                    return Result.Failure(change.Error);
+                }
+
+                inventory.Add(StockMovement.Record(product.TenantId, product.Id, product.Name, change.Value, "Ajuste pelo cadastro do produto", "cadastro", now));
+            }
+
+            await unitOfWork.SaveChangesAsync(ct);
+            return Result.Success();
+        }, cancellationToken);
+        }
+        catch (UniqueConstraintViolationException ex)
+        {
+            return UniqueViolation(ex, product);
+        }
+
+        return adjusted.IsFailure ? adjusted.Error : await ReadAsync(product, cancellationToken);
     }
 
     public async Task<Result> Handle(DeleteProductCommand request, CancellationToken cancellationToken)
@@ -231,7 +292,6 @@ internal sealed class ProductCommandHandlers(
             input.DiscountPrice.Or(current?.DiscountPriceCents),
             input.Cost.Or(current?.CostCents),
             input.Images ?? current!.Images,
-            input.Stock ?? current!.Stock,
             input.LowStockThreshold ?? current?.LowStockThreshold ?? 3,
             input.IsActive ?? current!.IsActive,
             input.IsFeatured ?? current!.IsFeatured,
@@ -246,15 +306,21 @@ internal sealed class ProductCommandHandlers(
         {
             await unitOfWork.SaveChangesAsync(cancellationToken);
         }
-        catch (UniqueConstraintViolationException ex) when (ex.ConstraintName.Contains("slug", StringComparison.Ordinal))
+        catch (UniqueConstraintViolationException ex)
         {
-            return CatalogErrors.ProductSlugTaken(product.Slug.Value);
-        }
-        catch (UniqueConstraintViolationException)
-        {
-            return Error.Conflict("CONFLICT", "Já existe um produto com este SKU ou código de barras.");
+            return UniqueViolation(ex, product);
         }
 
+        return await ReadAsync(product, cancellationToken);
+    }
+
+    private static Error UniqueViolation(UniqueConstraintViolationException ex, Product product) =>
+        ex.ConstraintName.Contains("slug", StringComparison.Ordinal)
+            ? CatalogErrors.ProductSlugTaken(product.Slug.Value)
+            : Error.Conflict("CONFLICT", "Já existe um produto com este SKU ou código de barras.");
+
+    private async Task<Result<ProductEnvelope>> ReadAsync(Product product, CancellationToken cancellationToken)
+    {
         await cache.InvalidateAsync(cancellationToken);
         var saved = await queries.GetProductBySlugAsync(product.Slug.Value, includeCost: true, cancellationToken);
         return new ProductEnvelope(saved!);

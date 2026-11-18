@@ -4,6 +4,7 @@ using Floruna.Domain.Audit;
 using Floruna.Domain.Catalog;
 using Floruna.Domain.Customers;
 using Floruna.Domain.Identity;
+using Floruna.Domain.Inventory;
 using Floruna.Domain.Platform;
 using Floruna.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -36,6 +37,14 @@ public sealed class FlorunaDbContext(DbContextOptions<FlorunaDbContext> options,
 
     public DbSet<Collection> Collections => Set<Collection>();
 
+    public DbSet<StockItem> StockItems => Set<StockItem>();
+
+    public DbSet<StockLot> StockLots => Set<StockLot>();
+
+    public DbSet<StockMovement> StockMovements => Set<StockMovement>();
+
+    public DbSet<StockReservation> StockReservations => Set<StockReservation>();
+
     /// <summary>Contadores de tentativas de login. Global (a chave já embute a loja).</summary>
     internal DbSet<Security.LoginAttemptBucket> LoginAttempts => Set<Security.LoginAttemptBucket>();
 
@@ -58,6 +67,42 @@ public sealed class FlorunaDbContext(DbContextOptions<FlorunaDbContext> options,
         {
             // Tradução da linguagem do banco para a da aplicação.
             throw new UniqueConstraintViolationException(pg.ConstraintName ?? "unknown", ex);
+        }
+    }
+
+    /// <summary>
+    /// Transação explícita. Sem retry automático DE PROPÓSITO: repetir o bloco
+    /// re-aplicaria regras em objetos de domínio já alterados em memória (ex.: tirar
+    /// do lote duas vezes). Falha transitória vira erro; quem chama repete com a
+    /// MESMA chave de idempotência (ver ADR 0004).
+    /// </summary>
+    public async Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> work, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(work);
+        if (Database.CurrentTransaction is not null)
+        {
+            return await work(cancellationToken); // já dentro de uma transação: participa dela
+        }
+
+        await using var transaction = await Database.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            var result = await work(cancellationToken);
+            if (result is SharedKernel.Result { IsFailure: true })
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                ChangeTracker.Clear(); // nada do que foi alterado em memória pode vazar para um próximo SaveChanges
+                return result;
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+            return result;
+        }
+        catch
+        {
+            await transaction.RollbackAsync(CancellationToken.None);
+            ChangeTracker.Clear();
+            throw;
         }
     }
 

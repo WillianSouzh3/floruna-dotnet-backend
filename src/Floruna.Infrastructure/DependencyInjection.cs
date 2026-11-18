@@ -1,12 +1,15 @@
 using Floruna.Application.Abstractions;
 using Floruna.Application.Catalog;
+using Floruna.Application.Inventory;
 using Floruna.Domain.Audit;
 using Floruna.Domain.Catalog;
 using Floruna.Domain.Customers;
 using Floruna.Domain.Identity;
+using Floruna.Domain.Inventory;
 using Floruna.Domain.Platform;
 using Floruna.Infrastructure.Catalog;
 using Floruna.Infrastructure.Dns;
+using Floruna.Infrastructure.Inventory;
 using Floruna.Infrastructure.Mail;
 using Floruna.Infrastructure.Persistence;
 using Floruna.Infrastructure.Persistence.Repositories;
@@ -83,8 +86,7 @@ public static class DependencyInjection
         services.AddScoped<TenantStampInterceptor>();
         services.AddDbContext<FlorunaDbContext>((sp, options) => options
             .UseNpgsql(sp.GetRequiredService<IOptions<DatabaseOptions>>().Value.ConnectionString, npgsql => npgsql
-                .MigrationsHistoryTable("__ef_migrations_history")
-                .EnableRetryOnFailure(3))
+                .MigrationsHistoryTable("__ef_migrations_history"))
             .UseSnakeCaseNamingConvention()
             .AddInterceptors(sp.GetRequiredService<TenantStampInterceptor>()));
 
@@ -97,9 +99,16 @@ public static class DependencyInjection
 
         // Catálogo: escrita (repositório), leitura (queries) e cache da vitrine.
         services.AddScoped<ICatalogRepository, CatalogRepository>();
-        services.AddScoped<ICatalogQueries, CatalogQueries>();
+        services.AddScoped<CatalogQueries>();
+        services.AddScoped<ICatalogQueries>(sp => sp.GetRequiredService<CatalogQueries>());
         services.AddScoped<ICatalogCache, HybridCatalogCache>();
         services.AddHybridCache();
+
+        // Estoque: escrita com trava de linha, leitura por projeções e o job de expiração de reservas.
+        services.AddScoped<IInventoryRepository, InventoryRepository>();
+        services.AddScoped<IInventoryQueries, InventoryQueries>();
+        services.AddSingleton<ReservationExpiryJob>();
+        services.AddHostedService(sp => sp.GetRequiredService<ReservationExpiryJob>());
 
         services.AddHealthChecks().AddDbContextCheck<FlorunaDbContext>(DatabaseHealthCheckName, tags: ["ready"]);
     }

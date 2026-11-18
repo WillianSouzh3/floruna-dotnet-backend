@@ -15,7 +15,7 @@ public sealed class ProductTests
         string name = "Buquê de Rosas Vermelhas",
         string? slug = null) => new(
         name, slug, "Doze rosas colombianas", "Buquê com doze rosas vermelhas e folhagens.",
-        ProductCategory.Buques, [], price, discount, 8_000, ["https://cdn/rosa.webp"], 10, 3, true, false, "buq-001", null,
+        ProductCategory.Buques, [], price, discount, 8_000, ["https://cdn/rosa.webp"], 3, true, false, "buq-001", null,
         variants ?? []);
 
     [Fact]

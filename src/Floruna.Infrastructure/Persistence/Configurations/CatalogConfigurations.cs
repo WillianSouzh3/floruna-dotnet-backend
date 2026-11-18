@@ -14,7 +14,6 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             // O banco também protege as invariantes de dinheiro (defesa em profundidade).
             t.HasCheckConstraint("ck_products_price_positive", "price_cents > 0");
             t.HasCheckConstraint("ck_products_discount_below_price", "discount_price_cents IS NULL OR discount_price_cents < price_cents");
-            t.HasCheckConstraint("ck_products_stock_non_negative", "stock >= 0");
         });
         builder.HasKey(p => p.Id);
         builder.Property(p => p.Id).ValueGeneratedNever();

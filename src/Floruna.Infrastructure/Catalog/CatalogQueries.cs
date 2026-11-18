@@ -27,7 +27,7 @@ internal sealed class CatalogQueries(FlorunaDbContext db, TimeProvider clock) : 
             var all = await query.ToListAsync(cancellationToken);
             var position = ordered.Select((id, index) => (id, index)).ToDictionary(x => x.id, x => x.index);
             var sorted = all.OrderBy(p => position.GetValueOrDefault(p.Id.Value, int.MaxValue)).ToList();
-            return Page(sorted.Skip((page - 1) * limit).Take(limit).ToList(), sorted.Count, page, limit, includeCost);
+            return await PageAsync(sorted.Skip((page - 1) * limit).Take(limit).ToList(), sorted.Count, page, limit, includeCost, cancellationToken);
         }
 
         var total = await query.CountAsync(cancellationToken);
@@ -35,14 +35,14 @@ internal sealed class CatalogQueries(FlorunaDbContext db, TimeProvider clock) : 
             .OrderByDescending(p => p.CreatedAt).ThenByDescending(p => p.Id)
             .Skip((page - 1) * limit).Take(limit)
             .ToListAsync(cancellationToken);
-        return Page(items, total, page, limit, includeCost);
+        return await PageAsync(items, total, page, limit, includeCost, cancellationToken);
     }
 
     public async Task<ProductResponse?> GetProductBySlugAsync(string slug, bool includeCost, CancellationToken cancellationToken)
     {
         var target = CatalogSlug.FromPersistence(slug);
         var product = await db.Products.AsNoTracking().FirstOrDefaultAsync(p => p.Slug == target, cancellationToken);
-        return product is null ? null : ToResponse(product, includeCost);
+        return product is null ? null : (await MapAsync([product], includeCost, cancellationToken))[0];
     }
 
     public async Task<IReadOnlyList<CategoryResponse>> ListCategoriesAsync(bool onlyActive, CancellationToken cancellationToken) =>
@@ -137,8 +137,38 @@ internal sealed class CatalogQueries(FlorunaDbContext db, TimeProvider clock) : 
         return query;
     }
 
-    private static ProductPage Page(List<Product> items, int total, int page, int limit, bool includeCost) =>
-        new([.. items.Select(p => ToResponse(p, includeCost))], total, page, limit, (int)Math.Ceiling(total / (double)limit));
+    private async Task<ProductPage> PageAsync(List<Product> items, int total, int page, int limit, bool includeCost, CancellationToken cancellationToken) =>
+        new(await MapAsync(items, includeCost, cancellationToken), total, page, limit, (int)Math.Ceiling(total / (double)limit));
+
+    /// <summary>
+    /// Monta as respostas anexando a disponibilidade REAL do estoque (Fase 3):
+    /// físico, reservado e vendável (lotes não vencidos − reservas). Uma consulta
+    /// por página, não uma por produto (evita N+1).
+    /// </summary>
+    internal async Task<List<ProductResponse>> MapAsync(List<Product> products, bool includeCost, CancellationToken cancellationToken)
+    {
+        var ids = products.Select(p => p.Id).ToList();
+        var now = clock.GetUtcNow();
+        var stock = await db.StockItems.AsNoTracking()
+            .Where(i => ids.Contains(i.Id))
+            .Select(i => new
+            {
+                i.Id,
+                i.OnHand,
+                i.Reserved,
+                Sellable = db.StockLots.Where(l => l.ProductId == i.Id && l.Remaining > 0 && (l.ExpiresAt == null || l.ExpiresAt > now))
+                    .Sum(l => (int?)l.Remaining) ?? 0,
+            })
+            .ToDictionaryAsync(x => x.Id, cancellationToken);
+
+        return [.. products.Select(p =>
+        {
+            var availability = stock.TryGetValue(p.Id, out var s)
+                ? new AvailabilityResponse(s.OnHand, s.Reserved, Math.Max(0, s.Sellable - s.Reserved), "inventory")
+                : new AvailabilityResponse(0, 0, 0, "inventory");
+            return ToResponse(p, includeCost, availability);
+        })];
+    }
 
     private CollectionWithProductIds? WithIds(Collection? collection) => collection is null
         ? null
@@ -146,7 +176,8 @@ internal sealed class CatalogQueries(FlorunaDbContext db, TimeProvider clock) : 
             CatalogMapping.ToResponse(collection, clock.GetUtcNow()),
             [.. collection.Items.OrderBy(i => i.Position).Select(i => i.ProductId.ToString())]);
 
-    private static ProductResponse ToResponse(Product p, bool includeCost) => new(
+    /// <remarks><c>stock</c> = o que dá para vender agora (o campo que o front usa para "esgotado").</remarks>
+    private static ProductResponse ToResponse(Product p, bool includeCost, AvailabilityResponse availability) => new(
         p.Id.ToString(),
         p.Sku,
         p.Barcode,
@@ -160,12 +191,12 @@ internal sealed class CatalogQueries(FlorunaDbContext db, TimeProvider clock) : 
         p.DiscountPriceCents,
         includeCost ? p.CostCents : null,
         [.. p.Images],
-        p.Stock,
+        availability.Available,
         p.LowStockThreshold,
         p.IsActive,
         p.IsFeatured,
         [.. p.Variants.Select(v => new VariantResponse(v.Id.Value, v.Sku, v.Label, v.PriceCents, v.IsActive, "shared_product", "finished_good"))],
         CatalogMapping.Iso(p.CreatedAt),
         CatalogMapping.Iso(p.UpdatedAt),
-        new AvailabilityResponse(p.Stock, 0, p.Stock, "product"));
+        availability);
 }

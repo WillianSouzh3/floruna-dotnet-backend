@@ -10,6 +10,14 @@ namespace Floruna.Application.Abstractions;
 public interface IUnitOfWork
 {
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Executa <paramref name="work"/> numa transação explícita (necessária para
+    /// travar linhas com <c>FOR UPDATE</c>). Se o banco tiver uma falha transitória,
+    /// a operação INTEIRA é repetida, não só o último comando (execution strategy do EF).
+    /// O trabalho precisa ser repetível: sem efeitos externos lá dentro.
+    /// </summary>
+    Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> work, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Violação de índice único, traduzida do erro do banco (23505 no PostgreSQL).</summary>

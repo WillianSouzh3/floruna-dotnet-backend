@@ -24,7 +24,6 @@ public sealed record ProductDraft(
     long? DiscountPriceCents,
     long? CostCents,
     IReadOnlyList<string> Images,
-    int Stock,
     int LowStockThreshold,
     bool IsActive,
     bool IsFeatured,
@@ -84,9 +83,8 @@ public sealed class ProductCategoryLink
 /// então as regras entre elas (nomes/SKUs únicos, IDs estáveis) ficam num lugar só.
 /// </summary>
 /// <remarks>
-/// <see cref="Stock"/> é TRANSITÓRIO: na Fase 3 a disponibilidade passa a vir do
-/// estoque (lotes + ledger) e este campo vira só o saldo inicial migrado
-/// (Branch by Abstraction, como a nota 028 do Nest).
+/// O produto NÃO guarda estoque: a disponibilidade vem do agregado
+/// <c>Inventory.StockItem</c> (lotes + ledger). Uma fonte da verdade só (D-012).
 /// </remarks>
 public sealed class Product : AggregateRoot<ProductId>, ITenantOwned
 {
@@ -155,8 +153,6 @@ public sealed class Product : AggregateRoot<ProductId>, ITenantOwned
 
     public List<string> Images { get; private set; }
 
-    public int Stock { get; private set; }
-
     public int LowStockThreshold { get; private set; }
 
     public bool IsActive { get; private set; }
@@ -182,6 +178,13 @@ public sealed class Product : AggregateRoot<ProductId>, ITenantOwned
     }
 
     public Result Update(ProductDraft draft, DateTimeOffset now) => Apply(draft, now);
+
+    /// <summary>Reposição com custo informado atualiza o custo corrente (RN-25).</summary>
+    public void UpdateCost(long costCents, DateTimeOffset now)
+    {
+        CostCents = Money.FromCents(costCents).Cents;
+        UpdatedAt = now;
+    }
 
     private Result Apply(ProductDraft draft, DateTimeOffset now)
     {
@@ -223,7 +226,6 @@ public sealed class Product : AggregateRoot<ProductId>, ITenantOwned
         DiscountPriceCents = draft.DiscountPriceCents is { } d ? Money.FromCents(d).Cents : null;
         CostCents = draft.CostCents is { } c ? Money.FromCents(c).Cents : null;
         Images = [.. draft.Images];
-        Stock = draft.Stock;
         LowStockThreshold = draft.LowStockThreshold;
         IsActive = draft.IsActive;
         IsFeatured = draft.IsFeatured;

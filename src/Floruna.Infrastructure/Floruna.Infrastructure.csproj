@@ -19,4 +19,8 @@
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Os testes de integração disparam o job de expiração sem esperar o timer. -->
+    <InternalsVisibleTo Include="Floruna.Api.IntegrationTests" />
+  </ItemGroup>
 </Project>

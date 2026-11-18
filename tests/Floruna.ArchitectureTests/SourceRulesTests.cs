@@ -23,6 +23,29 @@ public sealed partial class SourceRulesTests
         offenders.ShouldBeEmpty("Use TimeProvider (injetado) em vez de DateTime.Now/UtcNow.");
     }
 
+    /// <summary>
+    /// Escapar do filtro da loja (<c>IgnoreQueryFilters</c>) é poder de plataforma.
+    /// Cada uso precisa estar nesta lista, revisada em code review.
+    /// </summary>
+    private static readonly HashSet<string> TenantFilterEscapeAllowlist = new(StringComparer.Ordinal)
+    {
+        "FlorunaDbContext.cs",   // só cita no comentário do filtro
+        "Repositories.cs",       // sessão do superadmin e impersonação (loja explícita na consulta)
+        "InventoryQueries.cs",   // job de expiração de reservas (varre todas as lojas)
+    };
+
+    [Fact]
+    public void Tenant_filter_is_only_bypassed_in_reviewed_places()
+    {
+        var offenders = SourceFiles()
+            .Where(file => File.ReadAllText(file).Contains("IgnoreQueryFilters", StringComparison.Ordinal))
+            .Select(Path.GetFileName)
+            .Where(name => !TenantFilterEscapeAllowlist.Contains(name!))
+            .ToList();
+
+        offenders.ShouldBeEmpty("Uso novo de IgnoreQueryFilters: justifique e inclua na allowlist (ver ADR 0002).");
+    }
+
     private static IEnumerable<string> SourceFiles()
     {
         var root = new DirectoryInfo(AppContext.BaseDirectory);
