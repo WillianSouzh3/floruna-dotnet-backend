@@ -1,3 +1,4 @@
+using Floruna.Domain.Catalog;
 using Floruna.Domain.Customers;
 using Floruna.Domain.Identity;
 using Floruna.SharedKernel;
@@ -12,3 +13,11 @@ internal sealed class StaffUserIdConverter() : ValueConverter<StaffUserId, Guid>
 internal sealed class CustomerIdConverter() : ValueConverter<CustomerId, Guid>(id => id.Value, value => new CustomerId(value));
 
 internal sealed class EmailConverter() : ValueConverter<Email, string>(email => email.Value, value => Email.FromPersistence(value));
+
+internal sealed class ProductIdConverter() : ValueConverter<ProductId, Guid>(id => id.Value, value => new ProductId(value));
+
+internal sealed class CategoryIdConverter() : ValueConverter<CategoryId, Guid>(id => id.Value, value => new CategoryId(value));
+
+internal sealed class CollectionIdConverter() : ValueConverter<CollectionId, Guid>(id => id.Value, value => new CollectionId(value));
+
+internal sealed class VariantIdConverter() : ValueConverter<VariantId, string>(id => id.Value, value => new VariantId(value));

@@ -28,6 +28,7 @@ internal static class PresentationExtensions
 
         services
             .AddControllers(options => options.Filters.Add<ApiEnvelopeResultFilter>())
+            .AddJsonOptions(json => json.JsonSerializerOptions.Converters.Add(new OptionalJsonConverterFactory()))
             .ConfigureApiBehaviorOptions(options =>
                 // Erro de binding/model state no mesmo formato do ValidationPipe do Nest.
                 options.InvalidModelStateResponseFactory = context =>

@@ -23,7 +23,13 @@ public static class DependencyInjection
         services.AddPipelineBehavior(typeof(ValidationBehavior<,>));
 
         // Validators são stateless: singleton é seguro e evita recriá-los a cada request.
-        services.AddValidatorsFromAssembly(assembly, ServiceLifetime.Singleton, includeInternalTypes: true);
+        // ProductInputValidator é composto dentro dos validators de criar/atualizar (recebe um
+        // parâmetro), então fica fora do registro automático.
+        services.AddValidatorsFromAssembly(
+            assembly,
+            ServiceLifetime.Singleton,
+            filter: scan => scan.ValidatorType != typeof(Catalog.ProductInputValidator),
+            includeInternalTypes: true);
 
         // Contexto da loja: UMA instância por requisição, exposta por dois tipos
         // (a interface só-leitura para todos, a classe concreta para quem preenche).

@@ -18,6 +18,7 @@
     <PackageVersion Include="BCrypt.Net-Next" Version="4.2.1" />
     <PackageVersion Include="MailKit" Version="5.0.0" />
     <PackageVersion Include="DnsClient" Version="1.8.0" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.Hybrid" Version="10.11.0" />
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.15" />
   </ItemGroup>
 

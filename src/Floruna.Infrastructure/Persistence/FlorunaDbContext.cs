@@ -1,6 +1,7 @@
 using System.Reflection;
 using Floruna.Application.Abstractions;
 using Floruna.Domain.Audit;
+using Floruna.Domain.Catalog;
 using Floruna.Domain.Customers;
 using Floruna.Domain.Identity;
 using Floruna.Domain.Platform;
@@ -28,6 +29,12 @@ public sealed class FlorunaDbContext(DbContextOptions<FlorunaDbContext> options,
     public DbSet<SingleUseToken> SingleUseTokens => Set<SingleUseToken>();
 
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+
+    public DbSet<Product> Products => Set<Product>();
+
+    public DbSet<Category> Categories => Set<Category>();
+
+    public DbSet<Collection> Collections => Set<Collection>();
 
     /// <summary>Contadores de tentativas de login. Global (a chave já embute a loja).</summary>
     internal DbSet<Security.LoginAttemptBucket> LoginAttempts => Set<Security.LoginAttemptBucket>();
@@ -60,6 +67,10 @@ public sealed class FlorunaDbContext(DbContextOptions<FlorunaDbContext> options,
         configurationBuilder.Properties<TenantId>().HaveConversion<TenantIdConverter>();
         configurationBuilder.Properties<StaffUserId>().HaveConversion<StaffUserIdConverter>();
         configurationBuilder.Properties<CustomerId>().HaveConversion<CustomerIdConverter>();
+        configurationBuilder.Properties<ProductId>().HaveConversion<ProductIdConverter>();
+        configurationBuilder.Properties<CategoryId>().HaveConversion<CategoryIdConverter>();
+        configurationBuilder.Properties<CollectionId>().HaveConversion<CollectionIdConverter>();
+        configurationBuilder.Properties<VariantId>().HaveConversion<VariantIdConverter>().HaveMaxLength(28);
         configurationBuilder.Properties<Email>().HaveConversion<EmailConverter>().HaveMaxLength(Email.MaxLength);
         configurationBuilder.Properties<Enum>().HaveConversion<string>().HaveMaxLength(32);
     }

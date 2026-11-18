@@ -1,8 +1,11 @@
 using Floruna.Application.Abstractions;
+using Floruna.Application.Catalog;
 using Floruna.Domain.Audit;
+using Floruna.Domain.Catalog;
 using Floruna.Domain.Customers;
 using Floruna.Domain.Identity;
 using Floruna.Domain.Platform;
+using Floruna.Infrastructure.Catalog;
 using Floruna.Infrastructure.Dns;
 using Floruna.Infrastructure.Mail;
 using Floruna.Infrastructure.Persistence;
@@ -91,6 +94,12 @@ public static class DependencyInjection
         services.AddScoped<ICustomerRepository, CustomerRepository>();
         services.AddScoped<ISingleUseTokenRepository, SingleUseTokenRepository>();
         services.AddScoped<IAuditRepository, AuditRepository>();
+
+        // Catálogo: escrita (repositório), leitura (queries) e cache da vitrine.
+        services.AddScoped<ICatalogRepository, CatalogRepository>();
+        services.AddScoped<ICatalogQueries, CatalogQueries>();
+        services.AddScoped<ICatalogCache, HybridCatalogCache>();
+        services.AddHybridCache();
 
         services.AddHealthChecks().AddDbContextCheck<FlorunaDbContext>(DatabaseHealthCheckName, tags: ["ready"]);
     }
