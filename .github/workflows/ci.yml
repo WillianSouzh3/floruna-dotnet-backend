@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore Floruna.slnx
+
+      - name: Build (warnings = erros)
+        run: dotnet build Floruna.slnx --no-restore -c Release
+
+      - name: Format check
+        run: dotnet format Floruna.slnx --verify-no-changes --no-restore
+
+      - name: Test (unit + architecture + integration)
+        run: dotnet test Floruna.slnx --no-build -c Release --collect:"XPlat Code Coverage" --results-directory TestResults
+
+      - name: Vulnerable packages
+        run: |
+          dotnet list Floruna.slnx package --vulnerable --include-transitive 2>&1 | tee vuln.txt
+          ! grep -q -i "has the following vulnerable packages" vuln.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: TestResults/**/coverage.cobertura.xml
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: build-test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build --build-arg GIT_SHA=${{ github.sha }} -t floruna-api:${{ github.sha }} .
+      # Fase 7: login no ECR via OIDC (aws-actions/configure-aws-credentials) e push.

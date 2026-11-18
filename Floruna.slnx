@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Floruna.Api/Floruna.Api.csproj" />
+    <Project Path="src/Floruna.Application/Floruna.Application.csproj" />
+    <Project Path="src/Floruna.Domain/Floruna.Domain.csproj" />
+    <Project Path="src/Floruna.Infrastructure/Floruna.Infrastructure.csproj" />
+    <Project Path="src/Floruna.SharedKernel/Floruna.SharedKernel.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Floruna.Api.IntegrationTests/Floruna.Api.IntegrationTests.csproj" />
+    <Project Path="tests/Floruna.Application.UnitTests/Floruna.Application.UnitTests.csproj" />
+    <Project Path="tests/Floruna.ArchitectureTests/Floruna.ArchitectureTests.csproj" />
+    <Project Path="tests/Floruna.Domain.UnitTests/Floruna.Domain.UnitTests.csproj" />
+  </Folder>
+</Solution>

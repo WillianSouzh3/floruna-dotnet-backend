@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Regras de negócio puras: só conhece o SharedKernel. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Floruna.SharedKernel\Floruna.SharedKernel.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!-- Composition root: HTTP, DI e configuração. -->
+  <PropertyGroup>
+    <UserSecretsId>floruna-api</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Floruna.Application\Floruna.Application.csproj" />
+    <ProjectReference Include="..\Floruna.Infrastructure\Floruna.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Scalar.AspNetCore" />
+  </ItemGroup>
+</Project>

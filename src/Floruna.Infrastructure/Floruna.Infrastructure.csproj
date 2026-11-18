@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Adaptadores: EF Core/PostgreSQL, gateways, e-mail (a partir da Fase 1). -->
+  <ItemGroup>
+    <ProjectReference Include="..\Floruna.Application\Floruna.Application.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+</Project>
