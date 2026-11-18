@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
@@ -19,12 +20,12 @@ public sealed record HealthChecksSnapshot(string Process, string Database);
 /// <c>live</c> para saber se reinicia a task e <c>ready</c> para saber se
 /// manda tráfego para ela.
 /// </summary>
+[AllowAnonymous]
 [Route(Contracts.ApiVersion.RoutePrefix + "/health")]
 public sealed class HealthController(HealthCheckService healthChecks, ProcessInfo processInfo, TimeProvider timeProvider)
     : ApiController
 {
-    /// <summary>O nome que o check de banco terá a partir da Fase 1.</summary>
-    public const string DatabaseCheckName = "database";
+    public const string DatabaseCheckName = Floruna.Infrastructure.DependencyInjection.DatabaseHealthCheckName;
 
     /// <summary>Liveness: o processo responde. Não consulta dependências.</summary>
     [HttpGet("live")]

@@ -1,7 +1,9 @@
 using Floruna.Api.Contracts;
 using Floruna.Api.Controllers;
 using Floruna.Api.Infrastructure;
+using Floruna.Api.Security;
 using Floruna.SharedKernel;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Scalar.AspNetCore;
@@ -40,7 +42,16 @@ internal static class PresentationExtensions
 
         services.AddExceptionHandler<GlobalExceptionHandler>();
         services.AddProblemDetails();
-        services.AddHealthChecks(); // Fase 1: .AddNpgSql(..., name: HealthController.DatabaseCheckName, tags: ["ready"])
+        services.AddHealthChecks(); // o check do banco é registrado pela Infrastructure
+
+        services.AddFlorunaAuthentication();
+        services.AddAuthorization();
+        // SCOPED, não singleton: depende do ITenantContext (scoped). Um singleton
+        // capturaria a loja da 1ª requisição para sempre (captive dependency).
+        // O ValidateScopes do ambiente Development detecta isso na subida.
+        services.AddScoped<IAuthorizationHandler, PlanFeatureHandler>();
+        services.AddSingleton<IAuthorizationMiddlewareResultHandler, ApiAuthorizationResultHandler>();
+        services.AddFlorunaRateLimiting(configuration);
         services.AddSingleton<ProcessInfo>();
         services.AddOpenApi("v1");
 
@@ -61,12 +72,21 @@ internal static class PresentationExtensions
             await http.Response.WriteAsJsonAsync(ApiResponses.Error(http, error)).ConfigureAwait(false);
         });
 
+        app.UseRouting();
         app.UseCors(FrontendCorsPolicy);
+
+        // A loja precisa estar resolvida ANTES da autenticação: o token é conferido contra ela.
+        app.UseMiddleware<TenantResolutionMiddleware>();
+        app.UseAuthentication();
+        app.UseAuthorization();
+        app.UseRateLimiter();
 
         app.MapOpenApi("/api/openapi/{documentName}.json");
         app.MapScalarApiReference("/api/docs", options => options.WithOpenApiRoutePattern("/api/openapi/{documentName}.json"));
 
-        app.MapControllers();
+        // Todo controller exige autenticação por padrão (como o JwtAuthGuard global do Nest);
+        // rotas públicas declaram [AllowAnonymous]. Seguro por padrão: esquecer o atributo fecha, não abre.
+        app.MapControllers().RequireAuthorization();
         return app;
     }
 

@@ -9,7 +9,8 @@ namespace Floruna.Api.IntegrationTests;
 /// O contrato que o front Next.js espera (o mesmo do NestJS atual).
 /// Quebrar qualquer um destes testes = quebrar o front.
 /// </summary>
-public sealed class ApiContractTests(FlorunaApiFactory factory) : IClassFixture<FlorunaApiFactory>
+[Collection(ApiCollection.Name)]
+public sealed class ApiContractTests(FlorunaApiFactory factory)
 {
     private readonly HttpClient _client = factory.CreateClient();
 

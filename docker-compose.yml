@@ -10,7 +10,8 @@ services:
       POSTGRES_USER: floruna
       POSTGRES_PASSWORD: floruna_dev_only
     ports:
-      - "5432:5432"
+      # 5433 no host para não colidir com outro Postgres local.
+      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -24,6 +25,15 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       Cors__AllowedOrigins__0: http://localhost:3000
+      ConnectionStrings__Floruna: Host=postgres;Port=5432;Database=floruna;Username=floruna;Password=floruna_dev_only
+      Database__MigrateOnStartup: "true"
+      # O MESMO segredo do front (proxy.ts). Nome legado do Nest aceito.
+      AUTH_SECRET: ${AUTH_SECRET:-dev-only-secret-change-me-0123456789abcdef}
+      Jwt__Secret: ""
+      Platform__Domain: localhost
+      # Seed de desenvolvimento: loja flora-lis + usuário master.
+      Seed__AdminEmail: admin@floraelis.com.br
+      Seed__AdminPassword: ${SEED_ADMIN_PASSWORD:-troque-esta-senha-local}
     ports:
       - "4000:4000"
     depends_on:

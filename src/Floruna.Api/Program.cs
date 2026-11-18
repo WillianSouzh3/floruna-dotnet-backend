@@ -1,6 +1,7 @@
 using Floruna.Api;
 using Floruna.Application;
 using Floruna.Infrastructure;
+using Floruna.Infrastructure.Persistence;
 
 // Composition root: o ÚNICO lugar que conhece todas as camadas.
 var builder = WebApplication.CreateBuilder(args);
@@ -13,6 +14,8 @@ builder.Services
 var app = builder.Build();
 
 app.UsePresentation();
+
+await app.Services.InitializeDatabaseAsync().ConfigureAwait(false);
 
 await app.RunAsync().ConfigureAwait(false);
 

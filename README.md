@@ -20,12 +20,13 @@ tests/
   Floruna.Domain.UnitTests        Money, Result, agregados
   Floruna.Application.UnitTests   mediator, pipeline, validação
   Floruna.ArchitectureTests       regra de dependência entre camadas
-  Floruna.Api.IntegrationTests    contrato HTTP (envelope, erros, headers, CORS, health)
+  Floruna.Api.IntegrationTests    contrato HTTP, auth, isolamento entre lojas (PostgreSQL real)
 ```
 
 ## Rodando
 
-Requer o **.NET 10 SDK** (`sudo apt install dotnet-sdk-10.0`) e Docker.
+Requer o **.NET 10 SDK** (`sudo apt install dotnet-sdk-10.0`) e Docker (os testes de integração sobem um
+PostgreSQL real com Testcontainers).
 
 ```bash
 dotnet test                          # todos os testes
@@ -43,10 +44,36 @@ Sem o SDK instalado, dá para usar o SDK em container:
 docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 dotnet test
 ```
 
+## Endpoints (mesmo contrato da API NestJS)
+
+| Método | Rota | Acesso |
+|---|---|---|
+| POST | `/api/v1/tenants/signup` | público, rate-limited |
+| POST | `/api/v1/auth/admin/login` | público, rate-limited |
+| POST | `/api/v1/auth/register` · `/api/v1/auth/login` | público (cliente), rate-limited |
+| GET | `/api/v1/auth/me` | autenticado |
+| POST | `/api/v1/auth/admin/revoke-sessions` | `superadmin`, `master`, `gerente` |
+| GET | `/api/v1/health`, `/health/live`, `/health/ready` | público |
+
+A loja vem do header `x-tenant-host` (enviado pelo BFF) ou do `Host`: `flora-lis.localhost:3000` → loja `flora-lis`.
+
+```bash
+docker compose up --build -d
+curl -X POST localhost:4000/api/v1/auth/admin/login -H 'x-tenant-host: flora-lis.localhost' \
+  -H 'content-type: application/json' -d '{"email":"admin@floraelis.com.br","password":"troque-esta-senha-local"}'
+```
+
 ## Configuração (Options Pattern, validada na subida)
 
 | Chave | Variável de ambiente | Exemplo |
 |---|---|---|
+| `ConnectionStrings:Floruna` | `ConnectionStrings__Floruna` | `Host=...;Database=floruna;...` |
+| `Jwt:Secret` (≥ 32) | `Jwt__Secret` ou `AUTH_SECRET` | **o mesmo do front** |
+| `Jwt:StaffTokenLifetime` / `CustomerTokenLifetime` | `Jwt__...` | `08:00:00` / `7.00:00:00` |
+| `Platform:Domain` / `DefaultTenantSlug` | `Platform__Domain` | `floruna.com.br` / `flora-lis` |
+| `Database:MigrateOnStartup` | `Database__MigrateOnStartup` | `true` só em dev |
+| `Seed:AdminEmail` / `AdminPassword` | `Seed__AdminEmail` | cria loja + master (dev) |
+| `RateLimiting:AuthPermitLimit` | `RateLimiting__AuthPermitLimit` | `5` por minuto |
 | `Cors:AllowedOrigins` | `Cors__AllowedOrigins__0` | `http://localhost:3000` |
 | `GIT_SHA` | `GIT_SHA` | SHA do commit (preenchido pelo CI na imagem) |
 
@@ -57,7 +84,7 @@ Configuração inválida impede a API de subir (fail-fast).
 | Fase | Conteúdo | Status |
 |---|---|---|
 | 0 | Fundação: solution, mediator, envelope, Options, health, CI, testes de arquitetura | ✅ |
-| 1 | Plataforma + Identity: tenant por host, query filter fail-closed, JWT compatível, planos | ⏳ |
+| 1 | Plataforma + Identity: tenant por host, query filter fail-closed, JWT compatível, planos | ✅ (núcleo) |
 | 2 | Catálogo | |
 | 3 | Estoque (lotes FEFO, ledger, reservas) | |
 | 4 | Checkout + Pedido + Outbox | |

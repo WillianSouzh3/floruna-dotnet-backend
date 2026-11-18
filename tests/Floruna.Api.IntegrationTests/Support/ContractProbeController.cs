@@ -1,6 +1,9 @@
 using System.ComponentModel.DataAnnotations;
 using Floruna.Api.Controllers;
+using Floruna.Api.Security;
+using Floruna.Domain.Platform;
 using Floruna.SharedKernel;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,6 +14,7 @@ namespace Floruna.Api.IntegrationTests.Support;
 /// HTTP (sucesso, erro de negócio, validação, exceção) sem depender de
 /// nenhum módulo de negócio.
 /// </summary>
+[AllowAnonymous]
 [Route("api/v1/_probe")]
 public sealed class ContractProbeController : ApiController
 {
@@ -42,4 +46,17 @@ public sealed class ContractProbeController : ApiController
     [HttpPost("flowers")]
     public IActionResult Create(CreateFlowerBody body) =>
         StatusCode(StatusCodes.Status201Created, new Flower(body.Name!, body.PriceCents));
+}
+
+/// <summary>Endpoints protegidos por plano, para testar o <see cref="RequiresPlanFeatureAttribute"/>.</summary>
+[Route("api/v1/_probe/plan")]
+public sealed class PlanProbeController : ApiController
+{
+    [HttpGet("pdv")]
+    [RequiresPlanFeature(PlanFeature.Pdv)]
+    public IActionResult Pdv() => Ok(new { feature = "pdv" });
+
+    [HttpGet("fiscal")]
+    [RequiresPlanFeature(PlanFeature.Fiscal)]
+    public IActionResult Fiscal() => Ok(new { feature = "fiscal" });
 }

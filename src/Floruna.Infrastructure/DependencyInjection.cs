@@ -1,22 +1,79 @@
+using Floruna.Application.Abstractions;
+using Floruna.Domain.Customers;
+using Floruna.Domain.Identity;
+using Floruna.Domain.Platform;
+using Floruna.Infrastructure.Persistence;
+using Floruna.Infrastructure.Persistence.Repositories;
+using Floruna.Infrastructure.Security;
+using Floruna.Infrastructure.Tenancy;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Floruna.Infrastructure;
 
 public static class DependencyInjection
 {
+    public const string DatabaseHealthCheckName = "database";
+
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        // SINGLETON via DI (não o Singleton "static Instance" do GoF):
-        // TimeProvider.System não tem estado, então uma instância serve o
-        // processo inteiro. Por ser injetado, os testes trocam por um
-        // FakeTimeProvider e controlam "agora" (cutoff de entrega, validade
-        // de lote, expiração de reserva). O domínio NUNCA chama DateTime.Now.
+        // SINGLETON via DI (não o Singleton "static Instance" do GoF): sem
+        // estado, uma instância serve o processo. Injetado, os testes trocam
+        // por FakeTimeProvider. O domínio NUNCA chama DateTime.Now.
         services.AddSingleton(TimeProvider.System);
 
-        // Fase 1: DbContext (PostgreSQL), interceptors de tenant e outbox, repositórios.
+        AddOptions(services, configuration);
+        AddPersistence(services);
+
+        services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
+        services.AddSingleton<IAccessTokenIssuer, JwtAccessTokenIssuer>();
+        services.AddMemoryCache();
+        services.AddSingleton<ITenantResolver, TenantHostResolver>();
+
         return services;
+    }
+
+    private static void AddOptions(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<DatabaseOptions>()
+            .Configure(o =>
+            {
+                o.ConnectionString = configuration.GetConnectionString("Floruna") ?? string.Empty;
+                o.MigrateOnStartup = configuration.GetValue<bool>("Database:MigrateOnStartup");
+            })
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddOptions<JwtOptions>()
+            .Bind(configuration.GetSection(JwtOptions.SectionName))
+            // Compatibilidade com o .env do Nest: AUTH_SECRET continua valendo.
+            .PostConfigure(o => o.Secret = string.IsNullOrWhiteSpace(o.Secret) ? configuration["AUTH_SECRET"] ?? string.Empty : o.Secret)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddOptions<PlatformOptions>().Bind(configuration.GetSection(PlatformOptions.SectionName));
+        services.AddOptions<SeedOptions>().Bind(configuration.GetSection(SeedOptions.SectionName));
+    }
+
+    private static void AddPersistence(IServiceCollection services)
+    {
+        services.AddScoped<TenantStampInterceptor>();
+        services.AddDbContext<FlorunaDbContext>((sp, options) => options
+            .UseNpgsql(sp.GetRequiredService<IOptions<DatabaseOptions>>().Value.ConnectionString, npgsql => npgsql
+                .MigrationsHistoryTable("__ef_migrations_history")
+                .EnableRetryOnFailure(3))
+            .UseSnakeCaseNamingConvention()
+            .AddInterceptors(sp.GetRequiredService<TenantStampInterceptor>()));
+
+        services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<FlorunaDbContext>());
+        services.AddScoped<ITenantRepository, TenantRepository>();
+        services.AddScoped<IStaffUserRepository, StaffUserRepository>();
+        services.AddScoped<ICustomerRepository, CustomerRepository>();
+
+        services.AddHealthChecks().AddDbContextCheck<FlorunaDbContext>(DatabaseHealthCheckName, tags: ["ready"]);
     }
 }

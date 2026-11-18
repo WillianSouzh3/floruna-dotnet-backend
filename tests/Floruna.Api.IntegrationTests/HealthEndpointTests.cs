@@ -4,7 +4,8 @@ using Floruna.Api.IntegrationTests.Support;
 
 namespace Floruna.Api.IntegrationTests;
 
-public sealed class HealthEndpointTests(FlorunaApiFactory factory) : IClassFixture<FlorunaApiFactory>
+[Collection(ApiCollection.Name)]
+public sealed class HealthEndpointTests(FlorunaApiFactory factory)
 {
     private readonly HttpClient _client = factory.CreateClient();
 
@@ -28,11 +29,11 @@ public sealed class HealthEndpointTests(FlorunaApiFactory factory) : IClassFixtu
     }
 
     [Fact]
-    public async Task Readiness_reports_database_as_not_configured_until_phase_1()
+    public async Task Readiness_checks_the_real_database()
     {
         var response = await _client.GetAsync("/api/v1/health/ready");
 
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        body.RootElement.GetProperty("data").GetProperty("db").GetString().ShouldBe("not_configured");
+        body.RootElement.GetProperty("data").GetProperty("db").GetString().ShouldBe("up");
     }
 }
