@@ -33,6 +33,7 @@ public sealed partial class SourceRulesTests
         "Repositories.cs",       // sessão do superadmin e impersonação (loja explícita na consulta)
         "InventoryQueries.cs",   // job de expiração de reservas (varre todas as lojas)
         "CommerceRepositories.cs", // job de pedidos abandonados (varre todas as lojas)
+        "LoyaltyRepository.cs",  // job de expiração de cashback (varre todas as lojas)
     };
 
     [Fact]

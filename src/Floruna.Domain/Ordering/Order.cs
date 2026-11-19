@@ -57,9 +57,12 @@ public sealed record StatusChange(
     OrderStatus? From, OrderStatus To, DateTimeOffset At, Guid? ActorId, string ActorRole, string Reason, string? IdempotencyKey);
 
 /// <summary>Valores calculados no SERVIDOR (RN-40): o cliente nunca informa preço.</summary>
-public sealed record OrderTotals(long SubtotalCents, long DiscountCents, long DeliveryFeeCents, long GiftCardFeeCents)
+/// <param name="DiscountCents">Desconto na MERCADORIA: cupom + nível de fidelidade (contrato do Nest).</param>
+/// <param name="CashbackUsedCents">Saldo de cashback usado: é forma de pagamento, não desconto.</param>
+/// <param name="TierDiscountCents">Parte do desconto que veio do nível (já incluída em <paramref name="DiscountCents"/>).</param>
+public sealed record OrderTotals(long SubtotalCents, long DiscountCents, long DeliveryFeeCents, long GiftCardFeeCents, long CashbackUsedCents = 0, long TierDiscountCents = 0)
 {
-    public long TotalCents => SubtotalCents - DiscountCents + DeliveryFeeCents + GiftCardFeeCents;
+    public long TotalCents => SubtotalCents - DiscountCents + DeliveryFeeCents + GiftCardFeeCents - CashbackUsedCents;
 }
 
 public sealed record OrderPlacement(
@@ -121,6 +124,8 @@ public sealed class Order : AggregateRoot<OrderId>, ITenantOwned
         DiscountCents = p.Totals.DiscountCents;
         DeliveryFeeCents = p.Totals.DeliveryFeeCents;
         GiftCardFeeCents = p.Totals.GiftCardFeeCents;
+        TierDiscountCents = p.Totals.TierDiscountCents;
+        CashbackUsedCents = p.Totals.CashbackUsedCents;
         TotalCents = p.Totals.TotalCents;
         DeliveryMethod = p.DeliveryMethod;
         Address = p.Address;
@@ -158,6 +163,22 @@ public sealed class Order : AggregateRoot<OrderId>, ITenantOwned
     public long GiftCardFeeCents { get; private set; }
 
     public long TotalCents { get; private set; }
+
+    public long TierDiscountCents { get; private set; }
+
+    public long CashbackUsedCents { get; private set; }
+
+    /// <summary>Carteira de onde saiu o cashback usado (pode não ser a do e-mail do pedido).</summary>
+    public Guid? LoyaltyAccountId { get; private set; }
+
+    /// <summary>Guardião do acúmulo: o cashback do pedido é creditado UMA vez.</summary>
+    public DateTimeOffset? LoyaltyAccruedAt { get; private set; }
+
+    /// <summary>Guardião do estorno do resgate.</summary>
+    public DateTimeOffset? LoyaltyReversedAt { get; private set; }
+
+    /// <summary>Desconto do cupom (o total menos a parte do nível).</summary>
+    public long CouponDiscountCents => DiscountCents - TierDiscountCents;
 
     public DeliveryMethod DeliveryMethod { get; private set; }
 
@@ -296,6 +317,32 @@ public sealed class Order : AggregateRoot<OrderId>, ITenantOwned
     {
         PaymentStatus = status;
         UpdatedAt = now;
+    }
+
+    public void LinkLoyaltyAccount(Guid accountId) => LoyaltyAccountId = accountId;
+
+    /// <returns>false se já foi acumulado (replay da outbox).</returns>
+    public bool MarkLoyaltyAccrued(DateTimeOffset now)
+    {
+        if (LoyaltyAccruedAt is not null)
+        {
+            return false;
+        }
+
+        LoyaltyAccruedAt = now;
+        return true;
+    }
+
+    /// <returns>false se já foi estornado.</returns>
+    public bool MarkLoyaltyReversed(DateTimeOffset now)
+    {
+        if (LoyaltyReversedAt is not null)
+        {
+            return false;
+        }
+
+        LoyaltyReversedAt = now;
+        return true;
     }
 
     public bool IsAbandonedAt(DateTimeOffset now) => Status == OrderStatus.Pendente && now >= PaymentDeadline;

@@ -65,6 +65,12 @@ public sealed class FlorunaDbContext(DbContextOptions<FlorunaDbContext> options,
 
     public DbSet<PaymentNotification> PaymentNotifications => Set<PaymentNotification>();
 
+    public DbSet<Domain.Loyalty.LoyaltyProgram> LoyaltyPrograms => Set<Domain.Loyalty.LoyaltyProgram>();
+
+    public DbSet<Domain.Loyalty.LoyaltyAccount> LoyaltyAccounts => Set<Domain.Loyalty.LoyaltyAccount>();
+
+    public DbSet<Domain.Loyalty.LoyaltyEntry> LoyaltyEntries => Set<Domain.Loyalty.LoyaltyEntry>();
+
     internal DbSet<Configurations.DeliverySlotUsage> DeliverySlotUsage => Set<Configurations.DeliverySlotUsage>();
 
     internal DbSet<Outbox.OutboxMessage> OutboxMessages => Set<Outbox.OutboxMessage>();

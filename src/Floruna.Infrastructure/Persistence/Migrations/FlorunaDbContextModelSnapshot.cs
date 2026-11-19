@@ -808,6 +808,197 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Floruna.Domain.Loyalty.LoyaltyAccount", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("CashbackBalance")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cashback_balance");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("email");
+
+                    b.PrimitiveCollection<List<string>>("FlowerKinds")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("flower_kinds");
+
+                    b.Property<int>("OrdersCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("orders_count");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("TierKey")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("tier_key");
+
+                    b.Property<long>("TotalSpentCents")
+                        .HasColumnType("bigint")
+                        .HasColumnName("total_spent_cents");
+
+                    b.HasKey("Id")
+                        .HasName("pk_loyalty_accounts");
+
+                    b.HasIndex("TenantId", "Email")
+                        .IsUnique()
+                        .HasDatabaseName("ix_loyalty_accounts_tenant_id_email");
+
+                    b.HasIndex("TenantId", "TotalSpentCents")
+                        .HasDatabaseName("ix_loyalty_accounts_tenant_id_total_spent_cents");
+
+                    b.ToTable("loyalty_accounts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_loyalty_accounts_balance", "cashback_balance >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Loyalty.LoyaltyEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<long>("Amount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DedupeKey")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("dedupe_key");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("description");
+
+                    b.Property<DateTimeOffset?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("kind");
+
+                    b.Property<long>("Remaining")
+                        .HasColumnType("bigint")
+                        .HasColumnName("remaining");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_loyalty_entries");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("ix_loyalty_entries_expiring")
+                        .HasFilter("remaining > 0");
+
+                    b.HasIndex("AccountId", "CreatedAt")
+                        .HasDatabaseName("ix_loyalty_entries_account_id_created_at");
+
+                    b.HasIndex("AccountId", "ExpiresAt")
+                        .HasDatabaseName("ix_loyalty_entries_open_lots")
+                        .HasFilter("remaining > 0");
+
+                    b.HasIndex("TenantId", "DedupeKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_loyalty_entries_tenant_id_dedupe_key");
+
+                    b.ToTable("loyalty_entries", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_loyalty_entries_amount", "amount <> 0");
+
+                            t.HasCheckConstraint("ck_loyalty_entries_remaining", "remaining >= 0 AND remaining <= GREATEST(amount, 0)");
+                        });
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Loyalty.LoyaltyProgram", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("AllowCashbackWithCoupon")
+                        .HasColumnType("boolean")
+                        .HasColumnName("allow_cashback_with_coupon");
+
+                    b.Property<int>("CashbackExpiryDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("cashback_expiry_days");
+
+                    b.Property<long>("CashbackMinRedemption")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cashback_min_redemption");
+
+                    b.Property<decimal>("CashbackPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("cashback_percent");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<int>("MaxCashbackPercentOfOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_cashback_percent_of_order");
+
+                    b.Property<int>("MaxTotalDiscountPercent")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_total_discount_percent");
+
+                    b.Property<string>("Stacking")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("stacking");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_loyalty_programs");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_loyalty_programs_tenant_id");
+
+                    b.ToTable("loyalty_programs", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_loyalty_programs_cashback_share", "max_cashback_percent_of_order BETWEEN 0 AND 90");
+                        });
+                });
+
             modelBuilder.Entity("Floruna.Domain.Ordering.Order", b =>
                 {
                     b.Property<Guid>("Id")
@@ -819,6 +1010,10 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
                         .HasColumnName("access_token_hash");
+
+                    b.Property<long>("CashbackUsedCents")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cashback_used_cents");
 
                     b.Property<string>("CouponCode")
                         .HasMaxLength(40)
@@ -877,6 +1072,18 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(120)")
                         .HasColumnName("idempotency_key");
 
+                    b.Property<Guid?>("LoyaltyAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("loyalty_account_id");
+
+                    b.Property<DateTimeOffset?>("LoyaltyAccruedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("loyalty_accrued_at");
+
+                    b.Property<DateTimeOffset?>("LoyaltyReversedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("loyalty_reversed_at");
+
                     b.Property<DateTimeOffset>("PaymentDeadline")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("payment_deadline");
@@ -919,6 +1126,10 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
+
+                    b.Property<long>("TierDiscountCents")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tier_discount_cents");
 
                     b.Property<long>("TotalCents")
                         .HasColumnType("bigint")
@@ -1786,6 +1997,82 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_stock_reservations_stock_items_product_id");
                 });
 
+            modelBuilder.Entity("Floruna.Domain.Loyalty.LoyaltyAccount", b =>
+                {
+                    b.HasOne("Floruna.Domain.Platform.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_loyalty_accounts_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Loyalty.LoyaltyEntry", b =>
+                {
+                    b.HasOne("Floruna.Domain.Loyalty.LoyaltyAccount", null)
+                        .WithMany("ActiveCredits")
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_loyalty_entries_loyalty_accounts_account_id");
+
+                    b.HasOne("Floruna.Domain.Platform.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_loyalty_entries_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Loyalty.LoyaltyProgram", b =>
+                {
+                    b.HasOne("Floruna.Domain.Platform.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_loyalty_programs_tenants_tenant_id");
+
+                    b.OwnsMany("Floruna.Domain.Loyalty.LoyaltyTier", "Tiers", b1 =>
+                        {
+                            b1.Property<Guid>("LoyaltyProgramId");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAdd();
+
+                            b1.Property<decimal>("DiscountPercent");
+
+                            b1.Property<bool>("FreeShipping");
+
+                            b1.Property<string>("Key")
+                                .IsRequired();
+
+                            b1.Property<int>("MinFlowerKinds");
+
+                            b1.Property<int>("MinOrders");
+
+                            b1.Property<long>("MinSpent");
+
+                            b1.Property<string>("Name")
+                                .IsRequired();
+
+                            b1.HasKey("LoyaltyProgramId", "__synthesizedOrdinal")
+                                .HasName("pk_loyalty_programs");
+
+                            b1.ToTable("loyalty_programs");
+
+                            b1
+                                .ToJson("tiers")
+                                .HasColumnType("jsonb");
+
+                            b1.WithOwner()
+                                .HasForeignKey("LoyaltyProgramId")
+                                .HasConstraintName("fk_loyalty_programs_loyalty_programs_loyalty_program_id");
+                        });
+
+                    b.Navigation("Tiers");
+                });
+
             modelBuilder.Entity("Floruna.Domain.Ordering.Order", b =>
                 {
                     b.HasOne("Floruna.Domain.Platform.Tenant", null)
@@ -2074,6 +2361,11 @@ namespace Floruna.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Floruna.Domain.Inventory.StockItem", b =>
                 {
                     b.Navigation("Lots");
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Loyalty.LoyaltyAccount", b =>
+                {
+                    b.Navigation("ActiveCredits");
                 });
 #pragma warning restore 612, 618
         }

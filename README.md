@@ -67,7 +67,7 @@ docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 dotnet 
 | GET · POST · PATCH · DELETE | `/api/v1/categories/manage`, `/categories/{id}`, `/collections/manage`, `/collections/{id}`, `PUT /collections/{id}/products` | admin |
 | GET | `/api/v1/stock/low` · `/low/count` · `/expiring?days=7` · `/reservations` · `/{productId}/movements` · `/{productId}/lots` | admin |
 | POST | `/api/v1/stock/{productId}/restock` · `/adjust` · `/loss` · `/reservations/{id}/release` | admin |
-| POST | `/api/v1/orders` (checkout; login opcional) · GET `/orders/{id}?token=` | público (rate-limited) |
+| POST | `/api/v1/orders` (checkout; login opcional; `useCashback` exige sessão) · GET `/orders/{id}?token=` | público (rate-limited) |
 | GET | `/api/v1/orders` (filtros: `status`, `search`, `minTotal`, `maxTotal`) · PATCH `/orders/{id}/status` | admin |
 | GET | `/api/v1/orders/me` | cliente |
 | GET · POST · PUT · DELETE | `/api/v1/coupons` · GET `/coupons/validate?code=&subtotal=&email=` (público) | admin |
@@ -77,6 +77,8 @@ docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 dotnet 
 | GET · PUT | `/api/v1/settings/payments` (token do gateway só escrita) | admin |
 | POST | `/api/v1/payments/webhook?tenant={slug}` | público (sempre 200; verify-by-fetch) |
 | GET · POST | `/api/v1/payments/intents?orderId=` · `/intents/{id}` · `/intents/{id}/confirm-manual` | admin |
+| GET · PUT | `/api/v1/loyalty/program` · GET `/loyalty/accounts` · `/loyalty/liability` · POST `/loyalty/accounts/{id}/adjust` | admin (plano Pro+) |
+| GET | `/api/v1/loyalty/me` · `/loyalty/me/statement` | cliente |
 | GET | `/api/v1/health`, `/health/live`, `/health/ready` | público |
 
 A loja vem do header `x-tenant-host` (enviado pelo BFF) ou do `Host`: `flora-lis.localhost:3000` → loja `flora-lis`.
@@ -121,5 +123,6 @@ Configuração inválida impede a API de subir (fail-fast).
 | 3 | Estoque: lotes com validade, FEFO, ledger append-only, reservas com expiração, concorrência com trava de linha | ✅ |
 | 4 | Checkout + Pedido + Outbox: cupons, zonas e capacidade de entrega, checkout transacional e idempotente, estados, abandonados, outbox com DLQ | ✅ |
 | 5 | Pagamentos: BR Code PIX, Mercado Pago com resiliência, webhook verificado, confirmação manual, token cifrado | ✅ |
-| 6 | Fidelidade, oficinas, PDV, orçamentos | |
+| 6a | Fidelidade: cashback com razão de lotes, níveis, resgate no checkout com trava, acúmulo/estorno pela outbox, expiração | ✅ |
+| 6b–d | Reembolsos, oficinas, PDV + caixa | |
 | 7 | Produção na AWS (ECS Fargate, RDS, Secrets Manager, CDK) | |

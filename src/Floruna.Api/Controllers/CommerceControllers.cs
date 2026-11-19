@@ -19,7 +19,7 @@ public sealed record OrderItemRequest(string? ProductId, int Quantity, string? V
 public sealed record CheckoutRequest(
     string? IdempotencyKey, string? CustomerName, string? CustomerPhone, string? CustomerEmail, IReadOnlyList<OrderItemRequest>? Items,
     string? DeliveryMethod, DeliveryAddress? Address, string? DeliveryDate, string? DeliveryTimeWindow, GiftCard? GiftCard,
-    string? CouponCode, string? SubstitutionMode)
+    string? CouponCode, string? SubstitutionMode, long? UseCashback = null)
 {
     public CheckoutInput ToInput() => new(IdempotencyKey, CustomerName, CustomerPhone, CustomerEmail,
         Items?.Select(i => new OrderItemInput(i.ProductId, i.Quantity, i.VariantLabel)).ToList(),
@@ -30,7 +30,7 @@ public sealed record CheckoutRequest(
         },
         DeliveryDate, DeliveryTimeWindow,
         GiftCard is null ? null : new GiftCard(GiftCard.Message, GiftCard.From ?? string.Empty, GiftCard.To ?? string.Empty),
-        CouponCode, SubstitutionMode);
+        CouponCode, SubstitutionMode, UseCashback);
 }
 
 public sealed record UpdateOrderStatusRequest(string? Status, string? ExpectedState, string? IdempotencyKey, string? Reason);
@@ -49,8 +49,10 @@ public sealed class OrdersController(ISender sender) : ApiController
     public async Task<IActionResult> Create(CheckoutRequest body, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(body);
-        var customerId = User.FindFirstValue("role") == Roles.Customer && Guid.TryParse(User.FindFirstValue("sub"), out var id) ? id : (Guid?)null;
-        var result = await sender.Send(new PlaceOrderCommand(body.ToInput(), customerId), cancellationToken);
+        var isCustomer = User.FindFirstValue("role") == Roles.Customer;
+        var customerId = isCustomer && Guid.TryParse(User.FindFirstValue("sub"), out var id) ? id : (Guid?)null;
+        var sessionEmail = customerId is null ? null : User.FindFirstValue("email");
+        var result = await sender.Send(new PlaceOrderCommand(body.ToInput(), customerId, sessionEmail), cancellationToken);
         return FromResult(result, order => StatusCode(StatusCodes.Status201Created, order));
     }
 

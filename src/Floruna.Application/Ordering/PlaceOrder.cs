@@ -6,6 +6,7 @@ using Floruna.Application.Messaging;
 using Floruna.Domain.Catalog;
 using Floruna.Domain.Delivery;
 using Floruna.Domain.Inventory;
+using Floruna.Domain.Loyalty;
 using Floruna.Domain.Ordering;
 using Floruna.Domain.Promotions;
 using Floruna.SharedKernel;
@@ -14,7 +15,8 @@ using FluentValidation;
 namespace Floruna.Application.Ordering;
 
 /// <summary>Checkout da vitrine (<c>POST /orders</c>). Login opcional: <paramref name="CustomerId"/> vem do token, se houver.</summary>
-public sealed record PlaceOrderCommand(CheckoutInput Input, Guid? CustomerId) : ICommand<OrderEnvelope>;
+/// <param name="SessionEmail">E-mail DO TOKEN do cliente: a única carteira de onde o cashback pode sair.</param>
+public sealed record PlaceOrderCommand(CheckoutInput Input, Guid? CustomerId, string? SessionEmail = null) : ICommand<OrderEnvelope>;
 
 internal sealed partial class PlaceOrderValidator : AbstractValidator<PlaceOrderCommand>
 {
@@ -35,6 +37,7 @@ internal sealed partial class PlaceOrderValidator : AbstractValidator<PlaceOrder
         RuleFor(x => x.Input.Address!.ZipCode).Matches(@"^\d{5}-?\d{3}$").When(x => x.Input.Address is not null).WithMessage("CEP inválido. Use o formato 00000-000.");
         RuleFor(x => x.Input.GiftCard!.Message).NotEmpty().MaximumLength(300).When(x => x.Input.GiftCard is not null).WithMessage("A mensagem do cartão deve ter até 300 caracteres.");
         RuleFor(x => x.Input.IdempotencyKey).MaximumLength(120);
+        RuleFor(x => x.Input.UseCashback).GreaterThanOrEqualTo(0).When(x => x.Input.UseCashback is not null).WithMessage("Cashback inválido.");
     }
 
     [GeneratedRegex(@"^\(?\d{2}\)?\s?9?\d{4}-?\d{4}$")]
@@ -62,6 +65,8 @@ internal sealed class PlaceOrderHandler(
     IUnitOfWork unitOfWork,
     ICatalogCache cache,
     Payments.PaymentInitializer paymentInitializer,
+    Loyalty.CheckoutLoyalty loyalty,
+    ILoyaltyRepository loyaltyAccounts,
     TimeProvider clock) : ICommandHandler<PlaceOrderCommand, OrderEnvelope>
 {
     public async Task<Result<OrderEnvelope>> Handle(PlaceOrderCommand request, CancellationToken cancellationToken)
@@ -117,7 +122,25 @@ internal sealed class PlaceOrderHandler(
             benefit = evaluated.Value;
         }
 
-        var totals = new OrderTotals(subtotal, benefit.DiscountCents, benefit.FreeShipping ? 0 : resolved.Value.FeeCents, 0);
+        // 4. Fidelidade: desconto do nível, frete grátis e cashback, pela política da loja (RN-34, RN-35).
+        var quote = await loyalty.QuoteAsync(input.CustomerEmail, request.SessionEmail, subtotal, resolved.Value.FeeCents,
+            benefit.DiscountCents, benefit.FreeShipping, input.UseCashback ?? 0, cancellationToken);
+        OrderTotals totals;
+        if (quote is null)
+        {
+            totals = new OrderTotals(subtotal, benefit.DiscountCents, benefit.FreeShipping ? 0 : resolved.Value.FeeCents, 0);
+        }
+        else
+        {
+            var b = quote.Breakdown;
+            if (quote.CouponDiscarded)
+            {
+                coupon = null; // o cliente não recebeu nada pelo cupom: não consome uso
+            }
+
+            totals = new OrderTotals(subtotal, b.MerchandiseDiscount, b.DeliveryFee, 0, b.CashbackUsed, b.TierDiscount);
+        }
+
         var orderId = OrderId.New();
         var placed = Order.Place(orderId, new OrderPlacement(
             tenant.Id, input.IdempotencyKey, new CustomerContact(input.CustomerName!.Trim(), input.CustomerPhone!.Trim(), input.CustomerEmail?.Trim().ToLowerInvariant()),
@@ -134,7 +157,7 @@ internal sealed class PlaceOrderHandler(
         Result<bool> written;
         try
         {
-            written = await unitOfWork.ExecuteInTransactionAsync(ct => WriteAsync(order, coupon, resolved.Value, now, ct), cancellationToken);
+            written = await unitOfWork.ExecuteInTransactionAsync(ct => WriteAsync(order, coupon, quote, resolved.Value, now, ct), cancellationToken);
         }
         catch (UniqueConstraintViolationException) when (input.IdempotencyKey is { Length: > 0 } raced)
         {
@@ -156,7 +179,7 @@ internal sealed class PlaceOrderHandler(
         return new OrderEnvelope(OrderResponse.From(order, internalView: false, accessToken));
     }
 
-    private async Task<Result<bool>> WriteAsync(Order order, Coupon? coupon, DeliveryResolution resolved, DateTimeOffset now, CancellationToken ct)
+    private async Task<Result<bool>> WriteAsync(Order order, Coupon? coupon, Loyalty.LoyaltyQuote? quote, DeliveryResolution resolved, DateTimeOffset now, CancellationToken ct)
     {
         // Trava o estoque SEMPRE em ordem crescente de produto: dois checkouts com os
         // mesmos itens em ordem diferente nunca esperam um pelo outro em círculo (deadlock).
@@ -180,7 +203,21 @@ internal sealed class PlaceOrderHandler(
                 return CouponErrors.ExhaustedDuringCheckout;
             }
 
-            coupons.Add(new CouponRedemption(order.TenantId, coupon.Id, coupon.Code, order.Customer.Email, order.Id.Value, order.DiscountCents, order.TotalCents, now));
+            coupons.Add(new CouponRedemption(order.TenantId, coupon.Id, coupon.Code, order.Customer.Email, order.Id.Value, order.CouponDiscountCents, order.TotalCents, now));
+        }
+
+        // Cashback sai NA MESMA transação: se o pedido não for gravado, o saldo não sai.
+        // A conta é travada (FOR UPDATE): dois checkouts simultâneos não gastam o mesmo saldo.
+        if (quote is { Breakdown.CashbackUsed: > 0, RedeemEmail: { } redeemEmail })
+        {
+            var wallet = await loyaltyAccounts.GetForUpdateAsync(redeemEmail, ct);
+            if (wallet is null || wallet.Redeem(order.CashbackUsedCents, LoyaltyKeys.Redeem(order.Id.Value), "Usado no pedido", now).IsFailure)
+            {
+                return LoyaltyErrors.InsufficientBalance;
+            }
+
+            order.LinkLoyaltyAccount(wallet.Id);
+            loyaltyAccounts.Track(wallet);
         }
 
         if (resolved is { Date: { } date, Window: { } window, Slot: { } slot } &&

@@ -40,7 +40,9 @@ public sealed record OrderResponse(
     string? PaymentRail,
     string PixCode,
     string CreatedAt,
-    string UpdatedAt)
+    string UpdatedAt,
+    long TierDiscount,
+    long CashbackUsed)
 {
     public string PaymentMethod => "pix";
 
@@ -72,7 +74,9 @@ public sealed record OrderResponse(
             o.PaymentRail,
             o.PixCode,
             CatalogMapping.Iso(o.CreatedAt),
-            CatalogMapping.Iso(o.UpdatedAt));
+            CatalogMapping.Iso(o.UpdatedAt),
+            o.TierDiscountCents,
+            o.CashbackUsedCents);
     }
 }
 
@@ -94,7 +98,8 @@ public sealed record CheckoutInput(
     string? DeliveryTimeWindow,
     GiftCard? GiftCard,
     string? CouponCode,
-    string? SubstitutionMode);
+    string? SubstitutionMode,
+    long? UseCashback = null);
 
 public sealed record OrderListFilter(string? Status, string? Search, long? MinTotal, long? MaxTotal, int Page, int Limit);
 

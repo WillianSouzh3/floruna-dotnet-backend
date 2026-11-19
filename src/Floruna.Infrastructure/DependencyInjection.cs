@@ -2,6 +2,7 @@ using Floruna.Application.Abstractions;
 using Floruna.Application.Catalog;
 using Floruna.Application.Delivery;
 using Floruna.Application.Inventory;
+using Floruna.Application.Loyalty;
 using Floruna.Application.Ordering;
 using Floruna.Application.Outbox;
 using Floruna.Application.Payments;
@@ -12,6 +13,7 @@ using Floruna.Domain.Customers;
 using Floruna.Domain.Delivery;
 using Floruna.Domain.Identity;
 using Floruna.Domain.Inventory;
+using Floruna.Domain.Loyalty;
 using Floruna.Domain.Ordering;
 using Floruna.Domain.Payments;
 using Floruna.Domain.Platform;
@@ -142,6 +144,11 @@ public static class DependencyInjection
 
         // Pagamentos: repositório, cifra de segredos e o gateway com resiliência.
         services.AddScoped<IPaymentRepository, PaymentRepository>();
+
+        // Fidelidade: repositório com trava da conta, leituras e o job de expiração.
+        services.AddScoped<ILoyaltyRepository, Loyalty.LoyaltyRepository>();
+        services.AddScoped<ILoyaltyQueries, Loyalty.LoyaltyQueries>();
+        services.AddSingleton<Loyalty.LoyaltyExpiryJob>();
         services.AddSingleton<ISecretProtector, AesGcmSecretProtector>();
         services.AddHttpClient<IPaymentGateway, MercadoPagoGateway>((sp, http) =>
                 http.BaseAddress = sp.GetRequiredService<IOptions<MercadoPagoOptions>>().Value.BaseUrl)
@@ -166,6 +173,7 @@ public static class DependencyInjection
         services.AddHostedService(sp => sp.GetRequiredService<ReservationExpiryJob>());
         services.AddHostedService(sp => sp.GetRequiredService<OutboxProcessor>());
         services.AddHostedService(sp => sp.GetRequiredService<AbandonedOrdersJob>());
+        services.AddHostedService(sp => sp.GetRequiredService<Loyalty.LoyaltyExpiryJob>());
 
         services.AddHealthChecks().AddDbContextCheck<FlorunaDbContext>(DatabaseHealthCheckName, tags: ["ready"]);
     }
