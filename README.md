@@ -131,6 +131,13 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://aspire-dashboard:18889 docker compose --profi
 Toda resposta traz `X-Trace-Id`: com ele se acha a requisição inteira no painel, inclusive o que a outbox fez depois.
 Métricas de negócio no medidor `Floruna` (`floruna.orders.*`, `floruna.outbox.*`...). Detalhes: ADR 0014.
 
+## Contrato e carga
+
+- **Contrato**: `docs/openapi/v1.json` é o contrato versionado; mudou a API sem atualizar o snapshot, o teste quebra
+  (remoção de operação = quebra de contrato). Para aceitar: `UPDATE_OPENAPI_SNAPSHOT=1 dotnet test`.
+- **Paridade com o Nest**: `python3 tools/api_parity.py <nest>/api/openapi/v1.json > docs/paridade-api.md`.
+- **Carga**: `load/README.md` (k6, perfil Dia das Mães, resultados) e `docs/slo.md`.
+
 ## Infraestrutura (AWS)
 
 CDK em C# em `infra/` (precisa de Node.js 22 e .NET 8+). Guia completo: [docs/aws.md](docs/aws.md).
@@ -161,4 +168,5 @@ A imagem também roda como migrator: `docker run <imagem> migrate` aplica as mig
 | 6e | Pedido personalizado: orçamento versionado com máquina de estados, link com token, conversão única, concorrência por trava | ✅ |
 | 6f | Substituição com consentimento: modo do pedido congelado, tolerância da política, link com prazo, aplicação única com estoque travado | ✅ |
 | 6g | Observabilidade: OpenTelemetry (traces que atravessam a outbox, métricas de negócio, saúde da fila), `X-Trace-Id`, Aspire Dashboard local, ADOT na AWS | ✅ |
+| 7a | Contrato versionado (snapshot do OpenAPI no CI), paridade com o Nest ([docs/paridade-api.md](docs/paridade-api.md)), teste de carga k6 "Dia das Mães" e SLOs | ✅ |
 | 7 | Produção na AWS com CDK (C#): ECS Fargate api/worker/migrator, RDS Multi-AZ, Secrets Manager, ALB + WAF, alarmes, deploy via GitHub OIDC. Ver [docs/aws.md](docs/aws.md) | ✅ (pronta, não implantada) |

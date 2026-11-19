@@ -16,6 +16,7 @@ namespace Floruna.Api.IntegrationTests.Support;
 /// </summary>
 [AllowAnonymous]
 [Route("api/v1/_probe")]
+[ApiExplorerSettings(IgnoreApi = true)] // rota de teste: fora do contrato publicado (docs/openapi/v1.json)
 public sealed class ContractProbeController : ApiController
 {
     public sealed record Flower(string Name, long PriceCents);
@@ -50,6 +51,7 @@ public sealed class ContractProbeController : ApiController
 
 /// <summary>Endpoints protegidos por plano, para testar o <see cref="RequiresPlanFeatureAttribute"/>.</summary>
 [Route("api/v1/_probe/plan")]
+[ApiExplorerSettings(IgnoreApi = true)]
 public sealed class PlanProbeController : ApiController
 {
     [HttpGet("pdv")]

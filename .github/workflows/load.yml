@@ -1,0 +1,33 @@
+name: Carga (noturno)
+
+# Perfil leve do "Dia das Mães" contra a API em docker compose. Quebra se a latência passar dos SLOs
+# (RNF-01) ou se houver oversell (RNF-03). Não substitui teste em ambiente parecido com produção.
+on:
+  schedule:
+    - cron: "17 6 * * *" # 03:17 em São Paulo
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  k6:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CHECKOUT_RATE_LIMIT: "1000000"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sobe API + PostgreSQL
+        run: |
+          docker compose up --build -d
+          for i in $(seq 1 60); do curl -sf localhost:4000/api/v1/health/ready && exit 0; sleep 2; done
+          docker compose logs api; exit 1
+      - name: k6 (perfil leve)
+        run: |
+          docker run --rm -i --network host -e BASE_URL=http://localhost:4000 \
+            -e PEAK_BROWSE=150 -e PEAK_CHECKOUT=30 -e HOT_STOCK=300 -e HOLD=60s \
+            -v "$PWD/load:/load" grafana/k6 run /load/mothers-day.js
+      - name: Logs da API (se falhar)
+        if: failure()
+        run: docker compose logs api | tail -200

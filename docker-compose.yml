@@ -35,6 +35,8 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
       OTEL_EXPORTER_OTLP_PROTOCOL: grpc
       OTEL_SERVICE_NAME: floruna-api
+      # Teste de carga (load/): todo o tráfego do k6 vem de UM IP; suba o limite só para o teste.
+      RateLimiting__CheckoutPermitLimit: ${CHECKOUT_RATE_LIMIT:-30}
       # Seed de desenvolvimento: loja flora-lis + usuário master.
       Seed__AdminEmail: admin@floraelis.com.br
       Seed__AdminPassword: ${SEED_ADMIN_PASSWORD:-troque-esta-senha-local}

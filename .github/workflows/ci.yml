@@ -32,7 +32,9 @@ jobs:
           dotnet tool restore
           dotnet ef migrations has-pending-model-changes -p src/Floruna.Infrastructure -s src/Floruna.Infrastructure
 
-      - name: Test (unit + architecture + integration)
+      # O contrato HTTP (docs/openapi/v1.json) é verificado nos testes de integração (OpenApiContractTests):
+      # mudou o contrato sem atualizar o snapshot, o build quebra (RNF-10).
+      - name: Test (unit + architecture + integration + contrato)
         run: dotnet test Floruna.slnx --no-build -c Release --collect:"XPlat Code Coverage" --results-directory TestResults
 
       - name: Vulnerable packages
