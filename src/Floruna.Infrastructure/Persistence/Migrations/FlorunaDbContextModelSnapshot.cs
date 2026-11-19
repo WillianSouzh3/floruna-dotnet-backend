@@ -2017,6 +2017,175 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                     b.ToTable("coupon_redemptions", (string)null);
                 });
 
+            modelBuilder.Entity("Floruna.Domain.Substitutions.SubstitutionPolicy", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("ConsentWindowHours")
+                        .HasColumnType("integer")
+                        .HasColumnName("consent_window_hours");
+
+                    b.Property<string>("DefaultMode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("default_mode");
+
+                    b.Property<int>("PreapprovedTolerancePercent")
+                        .HasColumnType("integer")
+                        .HasColumnName("preapproved_tolerance_percent");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_substitution_policies");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_substitution_policies_tenant_id");
+
+                    b.ToTable("substitution_policies", (string)null);
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Substitutions.SubstitutionProposal", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("AppliedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("applied_at");
+
+                    b.Property<string>("ConsentTokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("consent_token_hash");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at");
+
+                    b.Property<string>("DecidedBy")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("decided_by");
+
+                    b.Property<DateTimeOffset?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<int>("ItemIndex")
+                        .HasColumnType("integer")
+                        .HasColumnName("item_index");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("OrderMode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("order_mode");
+
+                    b.Property<string>("OriginalName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("original_name");
+
+                    b.Property<Guid>("OriginalProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("original_product_id");
+
+                    b.Property<int>("PolicyVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("policy_version");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("reason");
+
+                    b.Property<bool>("RestockOriginal")
+                        .HasColumnType("boolean")
+                        .HasColumnName("restock_original");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("state");
+
+                    b.Property<string>("SubstituteName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("substitute_name");
+
+                    b.Property<Guid>("SubstituteProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("substitute_product_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<long>("ValueDelta")
+                        .HasColumnType("bigint")
+                        .HasColumnName("value_delta");
+
+                    b.Property<decimal>("ValueDeltaPercent")
+                        .HasPrecision(7, 2)
+                        .HasColumnType("numeric(7,2)")
+                        .HasColumnName("value_delta_percent");
+
+                    b.HasKey("Id")
+                        .HasName("pk_substitution_proposals");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("ix_substitution_proposals_pending_expiry")
+                        .HasFilter("state = 'Proposed'");
+
+                    b.HasIndex("TenantId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_substitution_proposals_tenant_id_idempotency_key");
+
+                    b.HasIndex("TenantId", "OrderId", "CreatedAt")
+                        .HasDatabaseName("ix_substitution_proposals_tenant_id_order_id_created_at");
+
+                    b.ToTable("substitution_proposals", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_substitution_proposals_quantity", "quantity > 0");
+                        });
+                });
+
             modelBuilder.Entity("Floruna.Domain.Workshops.Workshop", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2845,6 +3014,52 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                                 .HasConstraintName("fk_orders_orders_order_id");
                         });
 
+                    b.OwnsMany("Floruna.Domain.Ordering.OrderSubstitution", "Substitutions", b1 =>
+                        {
+                            b1.Property<Guid>("OrderId");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAdd();
+
+                            b1.Property<DateTimeOffset>("AppliedAt");
+
+                            b1.Property<string>("DecidedBy")
+                                .IsRequired();
+
+                            b1.Property<int>("ItemIndex");
+
+                            b1.Property<string>("OriginalName")
+                                .IsRequired();
+
+                            b1.Property<string>("OriginalProductId")
+                                .IsRequired();
+
+                            b1.Property<Guid>("ProposalId");
+
+                            b1.Property<int>("Quantity");
+
+                            b1.Property<bool>("Restocked");
+
+                            b1.Property<string>("SubstituteName")
+                                .IsRequired();
+
+                            b1.Property<string>("SubstituteProductId")
+                                .IsRequired();
+
+                            b1.HasKey("OrderId", "__synthesizedOrdinal")
+                                .HasName("pk_orders");
+
+                            b1.ToTable("orders");
+
+                            b1
+                                .ToJson("substitutions")
+                                .HasColumnType("jsonb");
+
+                            b1.WithOwner()
+                                .HasForeignKey("OrderId")
+                                .HasConstraintName("fk_orders_orders_order_id");
+                        });
+
                     b.OwnsMany("Floruna.Domain.Ordering.PosPayment", "Payments", b1 =>
                         {
                             b1.Property<Guid>("OrderId");
@@ -2923,6 +3138,8 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                     b.Navigation("Items");
 
                     b.Navigation("Payments");
+
+                    b.Navigation("Substitutions");
                 });
 
             modelBuilder.Entity("Floruna.Domain.Payments.PaymentIntent", b =>
@@ -3104,6 +3321,26 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_coupon_redemptions_coupons_coupon_id");
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Substitutions.SubstitutionPolicy", b =>
+                {
+                    b.HasOne("Floruna.Domain.Platform.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_substitution_policies_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Substitutions.SubstitutionProposal", b =>
+                {
+                    b.HasOne("Floruna.Domain.Platform.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_substitution_proposals_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Floruna.Domain.Workshops.Workshop", b =>

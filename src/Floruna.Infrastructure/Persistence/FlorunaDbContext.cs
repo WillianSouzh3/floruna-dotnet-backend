@@ -77,6 +77,10 @@ public sealed class FlorunaDbContext(DbContextOptions<FlorunaDbContext> options,
 
     public DbSet<Domain.CustomOrders.CustomQuote> CustomQuotes => Set<Domain.CustomOrders.CustomQuote>();
 
+    public DbSet<Domain.Substitutions.SubstitutionPolicy> SubstitutionPolicies => Set<Domain.Substitutions.SubstitutionPolicy>();
+
+    public DbSet<Domain.Substitutions.SubstitutionProposal> SubstitutionProposals => Set<Domain.Substitutions.SubstitutionProposal>();
+
     public DbSet<Domain.Loyalty.LoyaltyProgram> LoyaltyPrograms => Set<Domain.Loyalty.LoyaltyProgram>();
 
     public DbSet<Domain.Loyalty.LoyaltyAccount> LoyaltyAccounts => Set<Domain.Loyalty.LoyaltyAccount>();

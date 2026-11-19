@@ -81,6 +81,13 @@ public sealed record PosPlacement(
     TenantId TenantId, string? IdempotencyKey, CustomerContact Customer, IReadOnlyList<OrderItem> Items, long DiscountCents,
     IReadOnlyList<PosPayment> Payments, Guid OperatorId, Guid? CashSessionId);
 
+/// <summary>
+/// Troca aplicada num item. Os ITENS do pedido não mudam (são o registro da venda); a troca fica registrada à parte.
+/// </summary>
+public sealed record OrderSubstitution(
+    int ItemIndex, string OriginalProductId, string OriginalName, string SubstituteProductId, string SubstituteName,
+    int Quantity, Guid ProposalId, string DecidedBy, bool Restocked, DateTimeOffset AppliedAt);
+
 public sealed record OrderPlacement(
     TenantId TenantId,
     string? IdempotencyKey,
@@ -121,6 +128,7 @@ public sealed class Order : AggregateRoot<OrderId>, ITenantOwned
     private readonly List<OrderItem> _items = [];
     private readonly List<StatusChange> _history = [];
     private readonly List<PosPayment> _payments = [];
+    private readonly List<OrderSubstitution> _substitutions = [];
 
     private Order()
         : base(default)
@@ -253,6 +261,8 @@ public sealed class Order : AggregateRoot<OrderId>, ITenantOwned
     public string PaymentMethod { get; private set; } = "pix";
 
     public IReadOnlyList<PosPayment> Payments => _payments.AsReadOnly();
+
+    public IReadOnlyList<OrderSubstitution> Substitutions => _substitutions.AsReadOnly();
 
     public Guid? OperatorId { get; private set; }
 
@@ -396,6 +406,15 @@ public sealed class Order : AggregateRoot<OrderId>, ITenantOwned
     public void PaymentStatusChanged(string status, DateTimeOffset now)
     {
         PaymentStatus = status;
+        UpdatedAt = now;
+    }
+
+    /// <summary>Substituição só antes de sair para entrega: depois de entregue, é devolução (reembolso).</summary>
+    public bool AcceptsSubstitution => Status is OrderStatus.Confirmado or OrderStatus.EmPreparo;
+
+    public void RecordSubstitution(OrderSubstitution substitution, DateTimeOffset now)
+    {
+        _substitutions.Add(substitution);
         UpdatedAt = now;
     }
 

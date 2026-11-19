@@ -94,6 +94,26 @@ public sealed class OrdersController(ISender sender) : ApiController
         return FromResult(await sender.Send(command, cancellationToken), Ok);
     }
 
+    /// <summary>
+    /// Troca de item. Pré-aprovado dentro da tolerância: aplica na hora (200). Senão: proposta com link para o
+    /// cliente responder (202, com <c>consentToken</c> uma única vez). Pedido "exato": 409.
+    /// </summary>
+    [HttpPost("{id:guid}/resolutions/substitution")]
+    [Authorize(Roles = Roles.Admins)]
+    public async Task<IActionResult> Substitute(Guid id, SubstitutionRequest body, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        var command = new Application.Substitutions.ProposeSubstitutionCommand(id, body.OriginalProductId, body.SubstituteProductId, body.Quantity ?? 0,
+            body.Reason, body.RestockOriginal ?? false, body.IdempotencyKey, CurrentActor());
+        return FromResult(await sender.Send(command, cancellationToken),
+            outcome => outcome.Applied ? Ok(outcome) : StatusCode(StatusCodes.Status202Accepted, outcome));
+    }
+
+    [HttpGet("{id:guid}/substitutions")]
+    [Authorize(Roles = Roles.Admins)]
+    public async Task<IActionResult> Substitutions(Guid id, CancellationToken cancellationToken) =>
+        FromResult(await sender.Send(new Application.Substitutions.ListOrderSubstitutionsQuery(id), cancellationToken), Ok);
+
     /// <summary>Venda no balcão (PDV não fiscal): pedido já pago e entregue, com baixa de estoque.</summary>
     [HttpPost("pos")]
     [Authorize(Roles = Roles.PointOfSale)]
@@ -123,6 +143,8 @@ public sealed class OrdersController(ISender sender) : ApiController
             result => result.Refund.Status == "pending" ? StatusCode(StatusCodes.Status202Accepted, result) : Ok(result));
     }
 }
+
+public sealed record SubstitutionRequest(string? OriginalProductId, string? SubstituteProductId, int? Quantity, string? Reason, bool? RestockOriginal, string? IdempotencyKey);
 
 public sealed record PosPaymentRequest(string? Method, long Amount);
 

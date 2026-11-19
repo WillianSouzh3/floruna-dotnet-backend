@@ -56,6 +56,9 @@ public sealed record OrderResponse(
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? CashSessionId { get; init; }
 
+    /// <summary>Trocas aplicadas (os itens continuam como foram vendidos).</summary>
+    public IReadOnlyList<OrderSubstitution> Substitutions { get; init; } = [];
+
     public IReadOnlyList<object> ExtraFields => [];
 
     /// <param name="internalView">Painel: inclui o custo unitário (margem).</param>
@@ -92,6 +95,7 @@ public sealed record OrderResponse(
             Origin = o.Origin,
             Payments = [.. o.Payments.Select(p => new PosPaymentResponse(p.Method, p.AmountCents))],
             CashSessionId = internalView ? o.CashSessionId?.ToString() : null,
+            Substitutions = o.Substitutions,
         };
     }
 }

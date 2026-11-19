@@ -152,6 +152,9 @@ public static class DependencyInjection
         services.AddScoped<Domain.CustomOrders.ICustomOrderRepository, CustomOrders.CustomOrderRepository>();
         services.AddScoped<Application.CustomOrders.ICustomOrderQueries, CustomOrders.CustomOrderQueries>();
         services.AddSingleton<CustomOrders.CustomQuoteExpiryJob>();
+        services.AddScoped<Domain.Substitutions.ISubstitutionRepository, Substitutions.SubstitutionRepository>();
+        services.AddScoped<Application.Substitutions.ISubstitutionQueries, Substitutions.SubstitutionQueries>();
+        services.AddSingleton<Substitutions.SubstitutionExpiryJob>();
         services.AddScoped<IRefundQueries, RefundQueries>();
         services.AddSingleton<RefundRetryJob>();
 
@@ -186,6 +189,7 @@ public static class DependencyInjection
         services.AddHostedService(sp => sp.GetRequiredService<Loyalty.LoyaltyExpiryJob>());
         services.AddHostedService(sp => sp.GetRequiredService<RefundRetryJob>());
         services.AddHostedService(sp => sp.GetRequiredService<CustomOrders.CustomQuoteExpiryJob>());
+        services.AddHostedService(sp => sp.GetRequiredService<Substitutions.SubstitutionExpiryJob>());
 
         services.AddHealthChecks().AddDbContextCheck<FlorunaDbContext>(DatabaseHealthCheckName, tags: ["ready"]);
     }

@@ -108,6 +108,8 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.OwnsMany(o => o.History, h => h.ToJson("status_history"));
         builder.OwnsMany(o => o.Payments, p => p.ToJson("payments"));
         builder.Navigation(o => o.Payments).UsePropertyAccessMode(PropertyAccessMode.Field);
+        builder.OwnsMany(o => o.Substitutions, s => s.ToJson("substitutions"));
+        builder.Navigation(o => o.Substitutions).UsePropertyAccessMode(PropertyAccessMode.Field);
         builder.Property(o => o.Origin).HasMaxLength(10).IsRequired();
         builder.Property(o => o.PaymentMethod).HasMaxLength(20).IsRequired();
         builder.Navigation(o => o.Items).UsePropertyAccessMode(PropertyAccessMode.Field);
