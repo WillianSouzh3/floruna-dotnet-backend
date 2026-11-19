@@ -77,7 +77,7 @@ public static class DependencyInjection
         services.AddOptions<DatabaseOptions>()
             .Configure(o =>
             {
-                o.ConnectionString = configuration.GetConnectionString("Floruna") ?? string.Empty;
+                o.ConnectionString = DatabaseConnection.Compose(configuration);
                 o.MigrateOnStartup = configuration.GetValue<bool>("Database:MigrateOnStartup");
             })
             .ValidateDataAnnotations()

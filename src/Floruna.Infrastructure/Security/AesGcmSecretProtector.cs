@@ -11,10 +11,10 @@ public sealed class SecretsOptions
     public const string SectionName = "Secrets";
 
     /// <summary>
-    /// Chave de 32 bytes em base64 (<c>openssl rand -base64 32</c>). Na AWS vem do Secrets
-    /// Manager (ou vira envelope encryption com KMS, sem a chave nunca sair do HSM).
+    /// Chave de 32 bytes em base64 (<c>openssl rand -base64 32</c>) OU uma frase aleatória de 48+
+    /// caracteres (o formato que o Secrets Manager gera), da qual a chave é derivada com HKDF.
     /// </summary>
-    [Required(ErrorMessage = "Configure Secrets:EncryptionKey (32 bytes em base64).")]
+    [Required(ErrorMessage = "Configure Secrets:EncryptionKey (32 bytes em base64 ou 48+ caracteres aleatórios).")]
     public string EncryptionKey { get; set; } = string.Empty;
 }
 
@@ -23,16 +23,9 @@ internal sealed class SecretsOptionsValidator : IValidateOptions<SecretsOptions>
     public ValidateOptionsResult Validate(string? name, SecretsOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        try
-        {
-            return Convert.FromBase64String(options.EncryptionKey).Length == 32
-                ? ValidateOptionsResult.Success
-                : ValidateOptionsResult.Fail("Secrets:EncryptionKey precisa ter exatamente 32 bytes (base64).");
-        }
-        catch (FormatException)
-        {
-            return ValidateOptionsResult.Fail("Secrets:EncryptionKey não é base64 válido.");
-        }
+        return EncryptionKeyMaterial.Derive(options.EncryptionKey) is not null
+            ? ValidateOptionsResult.Success
+            : ValidateOptionsResult.Fail("Secrets:EncryptionKey precisa ser 32 bytes em base64 ou ter ao menos 48 caracteres aleatórios.");
     }
 }
 
@@ -85,5 +78,38 @@ internal sealed class AesGcmSecretProtector(IOptions<SecretsOptions> options) : 
         }
     }
 
-    private byte[] Key() => Convert.FromBase64String(options.Value.EncryptionKey);
+    private byte[] Key() => EncryptionKeyMaterial.Derive(options.Value.EncryptionKey)!;
+}
+
+/// <summary>
+/// Transforma o segredo configurado na chave AES-256. Dois formatos:
+/// <list type="bullet">
+/// <item>32 bytes em base64: usados como estão (compatível com o que já foi cifrado).</item>
+/// <item>Frase aleatória de 48+ caracteres (gerada pelo Secrets Manager, que não sabe gerar
+/// "32 bytes em base64"): a chave é DERIVADA com HKDF-SHA256. Uma senha digitada por humano não
+/// serve (HKDF não é lento como PBKDF2/Argon2): o segredo precisa ser aleatório de verdade.</item>
+/// </list>
+/// </summary>
+public static class EncryptionKeyMaterial
+{
+    public const int MinPassphraseLength = 48;
+    private static readonly byte[] Info = Encoding.UTF8.GetBytes("floruna/secret-protector/v1");
+
+    public static byte[]? Derive(string? configured)
+    {
+        if (string.IsNullOrEmpty(configured))
+        {
+            return null;
+        }
+
+        var raw = new byte[configured.Length];
+        if (Convert.TryFromBase64String(configured, raw, out var written) && written == 32)
+        {
+            return raw[..32];
+        }
+
+        return configured.Length >= MinPassphraseLength
+            ? HKDF.DeriveKey(HashAlgorithmName.SHA256, Encoding.UTF8.GetBytes(configured), 32, salt: null, info: Info)
+            : null;
+    }
 }

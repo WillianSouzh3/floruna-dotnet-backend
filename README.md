@@ -117,6 +117,19 @@ curl -X POST localhost:4000/api/v1/auth/admin/login -H 'x-tenant-host: flora-lis
 
 Configuração inválida impede a API de subir (fail-fast).
 
+## Infraestrutura (AWS)
+
+CDK em C# em `infra/` (precisa de Node.js 22 e .NET 8+). Guia completo: [docs/aws.md](docs/aws.md).
+
+```bash
+cd infra
+dotnet test                                    # asserções no CloudFormation + cdk-nag
+npx aws-cdk@2 synth -c env=staging -c imageTag=<sha>
+npx aws-cdk@2 deploy --all -c env=prod -c imageTag=<sha> -c certificateArn=arn:aws:acm:...
+```
+
+A imagem também roda como migrator: `docker run <imagem> migrate` aplica as migrations e sai.
+
 ## Roadmap
 
 | Fase | Conteúdo | Status |
@@ -131,4 +144,4 @@ Configuração inválida impede a API de subir (fail-fast).
 | 6b | Reembolsos: saga com o gateway, recusa x resultado desconhecido, retentativa idempotente, cancelamento de pago, devolução ao estoque | ✅ |
 | 6c | Oficinas: vagas atômicas (UPDATE condicional + inscrição na mesma transação), CHECK no banco | ✅ |
 | 6d | PDV + caixa: venda de balcão com pagamento dividido, caixa com conferência, venda x fechamento serializados por trava | ✅ |
-| 7 | Produção na AWS (ECS Fargate, RDS, Secrets Manager, CDK) | |
+| 7 | Produção na AWS com CDK (C#): ECS Fargate api/worker/migrator, RDS Multi-AZ, Secrets Manager, ALB + WAF, alarmes, deploy via GitHub OIDC. Ver [docs/aws.md](docs/aws.md) | ✅ (pronta, não implantada) |

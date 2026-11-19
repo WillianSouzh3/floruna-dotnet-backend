@@ -32,6 +32,21 @@ public static partial class DatabaseInitializer
         }
     }
 
+    /// <summary>
+    /// Modo "migrator" (<c>dotnet Floruna.Api.dll migrate</c>): aplica as migrations e sai. Na AWS roda
+    /// como task avulsa do ECS ANTES de trocar as tasks da API, com o mesmo binário da versão nova.
+    /// Duas execuções simultâneas não se atropelam: o EF Core 9+ trava a tabela de histórico.
+    /// </summary>
+    public static async Task MigrateDatabaseAsync(this IServiceProvider services, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        await using var scope = services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<FlorunaDbContext>();
+        var pending = (await db.Database.GetPendingMigrationsAsync(cancellationToken)).ToList();
+        await db.Database.MigrateAsync(cancellationToken);
+        LogMigrationsApplied(scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Floruna.Database"), pending.Count, string.Join(", ", pending));
+    }
+
     private static async Task SeedAsync(IServiceProvider provider, SeedOptions seed, ILogger logger, CancellationToken cancellationToken)
     {
         var db = provider.GetRequiredService<FlorunaDbContext>();
@@ -70,6 +85,9 @@ public static partial class DatabaseInitializer
             }
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "{Count} migration(s) aplicada(s): {Names}")]
+    private static partial void LogMigrationsApplied(ILogger logger, int count, string names);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Migrations aplicadas")]
     private static partial void LogMigrated(ILogger logger);

@@ -13,6 +13,13 @@ builder.Services
 
 var app = builder.Build();
 
+// Modo migrator (task avulsa no deploy): aplica as migrations e sai, sem subir HTTP nem jobs.
+if (args is ["migrate", ..])
+{
+    await app.Services.MigrateDatabaseAsync().ConfigureAwait(false);
+    return;
+}
+
 app.UsePresentation();
 
 await app.Services.InitializeDatabaseAsync().ConfigureAwait(false);

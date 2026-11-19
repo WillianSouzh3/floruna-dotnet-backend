@@ -1,0 +1,14 @@
+<Project>
+  <!-- Infra é um mundo à parte: NÃO herda o Directory.Build.props da raiz (net10, analisadores da API). -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <!-- Roda em qualquer runtime >= 8 (no CI, o SDK 10). -->
+    <RollForward>Major</RollForward>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <!-- O CDK em C# usa construtores com "props" mutáveis por padrão; regras de API pública não se aplicam aqui. -->
+    <NoWarn>$(NoWarn);CS1591;CA1859;CA1806</NoWarn>
+  </PropertyGroup>
+</Project>

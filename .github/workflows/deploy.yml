@@ -1,0 +1,116 @@
+name: Deploy
+
+# Deploy para a AWS. Sem chave de acesso guardada no GitHub: o job troca o token OIDC do GitHub
+# por uma credencial TEMPORÁRIA de uma role IAM que só confia neste repositório (ver docs/aws.md).
+on:
+  push:
+    branches: [main] # main → staging
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Ambiente
+        type: choice
+        options: [staging, prod]
+        default: staging
+
+permissions:
+  id-token: write # OIDC
+  contents: read
+
+concurrency:
+  group: deploy-${{ inputs.environment || 'staging' }}
+  cancel-in-progress: false # nunca interromper um deploy no meio
+
+env:
+  AWS_REGION: sa-east-1
+  IMAGE_TAG: ${{ github.sha }}
+  JSII_RUNTIME_PACKAGE_CACHE: disabled
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build e push (ARM64/Graviton; tag = SHA, imutável)
+        env:
+          REPOSITORY: ${{ steps.ecr.outputs.registry }}/floruna-api
+        run: |
+          if aws ecr describe-images --repository-name floruna-api --image-ids imageTag=$IMAGE_TAG >/dev/null 2>&1; then
+            echo "Imagem $IMAGE_TAG já existe (build once, deploy many)."; exit 0
+          fi
+          docker buildx build --platform linux/arm64 --build-arg GIT_SHA=$IMAGE_TAG \
+            -t $REPOSITORY:$IMAGE_TAG --push .
+
+  deploy:
+    needs: image
+    runs-on: ubuntu-latest
+    # Ambientes do GitHub: "prod" com aprovação manual obrigatória (configurar em Settings > Environments).
+    environment: ${{ inputs.environment || 'staging' }}
+    env:
+      TARGET: ${{ inputs.environment || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Contexto do CDK
+        run: |
+          CTX="-c env=$TARGET -c imageTag=$IMAGE_TAG -c account=${{ secrets.AWS_ACCOUNT_ID }}"
+          if [ "$TARGET" = "prod" ]; then CTX="$CTX -c certificateArn=${{ secrets.PROD_CERTIFICATE_ARN }}"; fi
+          if [ -n "${{ vars.ALARM_EMAIL }}" ]; then CTX="$CTX -c alarmEmail=${{ vars.ALARM_EMAIL }}"; fi
+          echo "CTX=$CTX" >> "$GITHUB_ENV"
+          echo "PREFIX=Floruna-$TARGET" >> "$GITHUB_ENV"
+
+      - name: 1. Infra de base (rede, banco, segredos)
+        working-directory: infra
+        run: npx --yes aws-cdk@2 deploy Floruna-Registry $PREFIX-Network $PREFIX-Data $CTX --require-approval never
+
+      - name: 2. Task de migrations com a imagem nova
+        working-directory: infra
+        run: npx --yes aws-cdk@2 deploy $PREFIX-Migration $CTX --require-approval never --outputs-file migration.json
+
+      - name: 3. Roda as migrations ANTES de trocar a API
+        working-directory: infra
+        run: |
+          OUT=$(jq -r --arg s "$PREFIX-Migration" '.[$s]' migration.json)
+          CLUSTER=$(echo "$OUT" | jq -r .OpsClusterName)
+          TASKDEF=$(echo "$OUT" | jq -r .MigratorTaskDefinition)
+          SUBNETS=$(echo "$OUT" | jq -r .AppSubnets)
+          SG=$(echo "$OUT" | jq -r .AppSecurityGroup)
+          TASK=$(aws ecs run-task --cluster "$CLUSTER" --task-definition "$TASKDEF" --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SG],assignPublicIp=DISABLED}" \
+            --query 'tasks[0].taskArn' --output text)
+          echo "Migrator: $TASK"
+          aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks "$TASK"
+          CODE=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$TASK" --query 'tasks[0].containers[0].exitCode' --output text)
+          if [ "$CODE" != "0" ]; then echo "::error::Migrations falharam (exit $CODE). A API NÃO foi atualizada."; exit 1; fi
+
+      - name: 4. Aplicação (rolling com circuit breaker e rollback automático)
+        working-directory: infra
+        run: npx --yes aws-cdk@2 deploy $PREFIX-App $CTX --require-approval never --outputs-file app.json
+
+      - name: 5. Smoke test
+        working-directory: infra
+        run: |
+          URL=$(jq -r --arg s "$PREFIX-App" '.[$s].ApiUrl' app.json)
+          for i in $(seq 1 30); do
+            curl -fsS "$URL/api/v1/health/ready" && exit 0
+            sleep 10
+          done
+          echo "::error::API não ficou pronta em $URL"; exit 1
