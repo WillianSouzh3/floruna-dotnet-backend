@@ -7,9 +7,11 @@
     <PackageReference Include="Shouldly" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Testcontainers.MongoDb" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Floruna.Api\Floruna.Api.csproj" />
+    <ProjectReference Include="..\..\src\Floruna.Migration\Floruna.Migration.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

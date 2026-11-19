@@ -4,6 +4,7 @@
     <Project Path="src/Floruna.Application/Floruna.Application.csproj" />
     <Project Path="src/Floruna.Domain/Floruna.Domain.csproj" />
     <Project Path="src/Floruna.Infrastructure/Floruna.Infrastructure.csproj" />
+    <Project Path="src/Floruna.Migration/Floruna.Migration.csproj" />
     <Project Path="src/Floruna.SharedKernel/Floruna.SharedKernel.csproj" />
   </Folder>
   <Folder Name="/tests/">

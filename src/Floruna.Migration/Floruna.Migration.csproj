@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- ETL Mongo (Nest) → PostgreSQL (.NET), por loja. Ferramenta de corte: roda uma vez por loja no cutover. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="MongoDB.Driver" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Floruna.Infrastructure\Floruna.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Floruna.Api.IntegrationTests" />
+  </ItemGroup>
+</Project>

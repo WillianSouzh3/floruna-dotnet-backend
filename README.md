@@ -169,4 +169,5 @@ A imagem também roda como migrator: `docker run <imagem> migrate` aplica as mig
 | 6f | Substituição com consentimento: modo do pedido congelado, tolerância da política, link com prazo, aplicação única com estoque travado | ✅ |
 | 6g | Observabilidade: OpenTelemetry (traces que atravessam a outbox, métricas de negócio, saúde da fila), `X-Trace-Id`, Aspire Dashboard local, ADOT na AWS | ✅ |
 | 7a | Contrato versionado (snapshot do OpenAPI no CI), paridade com o Nest ([docs/paridade-api.md](docs/paridade-api.md)), teste de carga k6 "Dia das Mães" e SLOs | ✅ |
+| 8 | Migração do Nest: ETL por loja (Mongo → PostgreSQL) com conferência, Strangler Fig por loja no BFF ([docs/migracao.md](docs/migracao.md)) | ✅ |
 | 7 | Produção na AWS com CDK (C#): ECS Fargate api/worker/migrator, RDS Multi-AZ, Secrets Manager, ALB + WAF, alarmes, deploy via GitHub OIDC. Ver [docs/aws.md](docs/aws.md) | ✅ (pronta, não implantada) |
