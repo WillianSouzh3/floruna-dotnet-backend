@@ -35,6 +35,7 @@ public sealed partial class SourceRulesTests
         "CommerceRepositories.cs", // job de pedidos abandonados (varre todas as lojas)
         "LoyaltyRepository.cs",  // job de expiração de cashback (varre todas as lojas)
         "RefundRepository.cs",   // job de retentativa de reembolsos (varre todas as lojas)
+        "CustomOrderRepository.cs", // job de expiração de orçamentos (varre todas as lojas)
     };
 
     [Fact]

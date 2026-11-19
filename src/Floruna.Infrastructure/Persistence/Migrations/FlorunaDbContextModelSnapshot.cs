@@ -298,6 +298,216 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Floruna.Domain.CustomOrders.CustomOrderRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AdminNotes")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("admin_notes");
+
+                    b.Property<string>("BudgetRange")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("budget_range");
+
+                    b.Property<string>("CardMessage")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("card_message");
+
+                    b.PrimitiveCollection<List<string>>("ColorPalette")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("color_palette");
+
+                    b.Property<string>("ContainerType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("container_type");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CustomerEmail")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("customer_email");
+
+                    b.Property<string>("CustomerName")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("customer_name");
+
+                    b.Property<string>("CustomerPhone")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("customer_phone");
+
+                    b.Property<DateTimeOffset?>("DesiredDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("desired_date");
+
+                    b.PrimitiveCollection<List<string>>("FlowerPreferences")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("flower_preferences");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("notes");
+
+                    b.Property<string>("Occasion")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("occasion");
+
+                    b.Property<long?>("QuotedPrice")
+                        .HasColumnType("bigint")
+                        .HasColumnName("quoted_price");
+
+                    b.Property<string>("Ribbon")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("ribbon");
+
+                    b.Property<string>("Size")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("size");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_custom_order_requests");
+
+                    b.HasIndex("TenantId", "Status", "CreatedAt")
+                        .HasDatabaseName("ix_custom_order_requests_tenant_id_status_created_at");
+
+                    b.ToTable("custom_order_requests", (string)null);
+                });
+
+            modelBuilder.Entity("Floruna.Domain.CustomOrders.CustomQuote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ConvertedOrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("converted_order_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at");
+
+                    b.Property<string>("DecisionReason")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("decision_reason");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("notes");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
+
+                    b.Property<string>("ResponseTokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("response_token_hash");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("state");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<long>("Total")
+                        .HasColumnType("bigint")
+                        .HasColumnName("total");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<DateTimeOffset?>("ValidUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("valid_until");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_custom_quotes");
+
+                    b.HasIndex("RequestId")
+                        .HasDatabaseName("ix_custom_quotes_request_id");
+
+                    b.HasIndex("ValidUntil")
+                        .HasDatabaseName("ix_custom_quotes_published_valid_until")
+                        .HasFilter("state = 'Published'");
+
+                    b.HasIndex("TenantId", "ConvertedOrderId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_custom_quotes_tenant_id_converted_order_id")
+                        .HasFilter("converted_order_id IS NOT NULL");
+
+                    b.HasIndex("TenantId", "RequestId", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("ix_custom_quotes_tenant_id_request_id_version");
+
+                    b.ToTable("custom_quotes", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_custom_quotes_total_not_negative", "total >= 0");
+                        });
+                });
+
             modelBuilder.Entity("Floruna.Domain.Customers.Customer", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2244,6 +2454,56 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                     b.Navigation("Categories");
 
                     b.Navigation("Variants");
+                });
+
+            modelBuilder.Entity("Floruna.Domain.CustomOrders.CustomOrderRequest", b =>
+                {
+                    b.HasOne("Floruna.Domain.Platform.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_custom_order_requests_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Floruna.Domain.CustomOrders.CustomQuote", b =>
+                {
+                    b.HasOne("Floruna.Domain.CustomOrders.CustomOrderRequest", null)
+                        .WithMany()
+                        .HasForeignKey("RequestId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_custom_quotes_custom_order_requests_request_id");
+
+                    b.OwnsMany("Floruna.Domain.CustomOrders.QuoteLine", "Lines", b1 =>
+                        {
+                            b1.Property<Guid>("CustomQuoteId");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAdd();
+
+                            b1.Property<string>("Description")
+                                .IsRequired();
+
+                            b1.Property<int>("Quantity");
+
+                            b1.Property<long>("UnitPrice");
+
+                            b1.HasKey("CustomQuoteId", "__synthesizedOrdinal")
+                                .HasName("pk_custom_quotes");
+
+                            b1.ToTable("custom_quotes");
+
+                            b1
+                                .ToJson("lines")
+                                .HasColumnType("jsonb");
+
+                            b1.WithOwner()
+                                .HasForeignKey("CustomQuoteId")
+                                .HasConstraintName("fk_custom_quotes_custom_quotes_custom_quote_id");
+                        });
+
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("Floruna.Domain.Customers.Customer", b =>

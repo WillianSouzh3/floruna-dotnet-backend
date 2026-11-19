@@ -149,6 +149,9 @@ public static class DependencyInjection
         services.AddScoped<Application.Workshops.IWorkshopQueries, Workshops.WorkshopQueries>();
         services.AddScoped<Domain.Pos.ICashSessionRepository, Pos.CashSessionRepository>();
         services.AddScoped<Application.Pos.ICashSessionQueries, Pos.CashSessionQueries>();
+        services.AddScoped<Domain.CustomOrders.ICustomOrderRepository, CustomOrders.CustomOrderRepository>();
+        services.AddScoped<Application.CustomOrders.ICustomOrderQueries, CustomOrders.CustomOrderQueries>();
+        services.AddSingleton<CustomOrders.CustomQuoteExpiryJob>();
         services.AddScoped<IRefundQueries, RefundQueries>();
         services.AddSingleton<RefundRetryJob>();
 
@@ -182,6 +185,7 @@ public static class DependencyInjection
         services.AddHostedService(sp => sp.GetRequiredService<AbandonedOrdersJob>());
         services.AddHostedService(sp => sp.GetRequiredService<Loyalty.LoyaltyExpiryJob>());
         services.AddHostedService(sp => sp.GetRequiredService<RefundRetryJob>());
+        services.AddHostedService(sp => sp.GetRequiredService<CustomOrders.CustomQuoteExpiryJob>());
 
         services.AddHealthChecks().AddDbContextCheck<FlorunaDbContext>(DatabaseHealthCheckName, tags: ["ready"]);
     }

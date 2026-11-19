@@ -83,6 +83,8 @@ docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 dotnet 
 | GET | `/api/v1/loyalty/me` · `/loyalty/me/statement` | cliente |
 | GET | `/api/v1/events` · `/events/{slug}` · POST `/events/{id}/registrations` | público |
 | POST · PUT · DELETE | `/api/v1/events` · GET `/events/{id}/registrations` | admin |
+| POST | `/api/v1/custom-orders` · POST `/custom-quotes/{id}/decision` · GET `/custom-quotes/{id}?token=` | público |
+| GET · PATCH | `/api/v1/custom-orders` · `/custom-orders/{id}/quotes` · POST `/custom-quotes/{id}/publish` · `/convert` | admin |
 | GET | `/api/v1/health`, `/health/live`, `/health/ready` | público |
 
 A loja vem do header `x-tenant-host` (enviado pelo BFF) ou do `Host`: `flora-lis.localhost:3000` → loja `flora-lis`.
@@ -144,4 +146,5 @@ A imagem também roda como migrator: `docker run <imagem> migrate` aplica as mig
 | 6b | Reembolsos: saga com o gateway, recusa x resultado desconhecido, retentativa idempotente, cancelamento de pago, devolução ao estoque | ✅ |
 | 6c | Oficinas: vagas atômicas (UPDATE condicional + inscrição na mesma transação), CHECK no banco | ✅ |
 | 6d | PDV + caixa: venda de balcão com pagamento dividido, caixa com conferência, venda x fechamento serializados por trava | ✅ |
+| 6e | Pedido personalizado: orçamento versionado com máquina de estados, link com token, conversão única, concorrência por trava | ✅ |
 | 7 | Produção na AWS com CDK (C#): ECS Fargate api/worker/migrator, RDS Multi-AZ, Secrets Manager, ALB + WAF, alarmes, deploy via GitHub OIDC. Ver [docs/aws.md](docs/aws.md) | ✅ (pronta, não implantada) |
