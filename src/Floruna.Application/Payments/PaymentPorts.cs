@@ -10,6 +10,8 @@ public sealed record GatewayPix(string ProviderPaymentId, string PixCode);
 /// <summary>O pagamento como o NOSSO domínio o entende (a ACL já traduziu o JSON do provedor).</summary>
 public sealed record GatewayPayment(string ProviderPaymentId, ProviderPaymentStatus Status, long AmountCents, Guid? OrderId);
 
+public sealed record GatewayRefund(string ProviderRefundId);
+
 /// <summary>
 /// Porta para o gateway (padrão Adapter + Anti-Corruption Layer). A aplicação fala
 /// "crie um PIX", "como está este pagamento"; os nomes, códigos e quirks do Mercado
@@ -20,6 +22,18 @@ public interface IPaymentGateway
     Task<Result<GatewayPix>> CreatePixAsync(string accessToken, GatewayPixRequest request, CancellationToken cancellationToken);
 
     Task<Result<GatewayPayment>> GetPaymentAsync(string accessToken, string providerPaymentId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Devolve <paramref name="amountCents"/> do pagamento. Erros: <see cref="GatewayErrors.Rejected"/> é
+    /// DEFINITIVO (o provedor recusou: nada saiu); qualquer outro é resultado DESCONHECIDO (timeout, 5xx).
+    /// </summary>
+    Task<Result<GatewayRefund>> RefundAsync(string accessToken, string providerPaymentId, long amountCents, string idempotencyKey, CancellationToken cancellationToken);
+}
+
+public static class GatewayErrors
+{
+    /// <summary>O provedor respondeu 4xx: a operação NÃO aconteceu e não adianta repetir igual.</summary>
+    public const string Rejected = "GATEWAY_REJECTED";
 }
 
 /// <summary>

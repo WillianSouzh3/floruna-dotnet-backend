@@ -40,6 +40,8 @@ public static class DependencyInjection
         services.AddScoped<Delivery.DeliveryResolver>();
         services.AddScoped<Payments.PaymentInitializer>();
         services.AddScoped<Loyalty.CheckoutLoyalty>();
+        services.AddScoped<Payments.RefundSaga>();
+        services.AddScoped<Payments.PaidOrderCancellation>();
         services.AddScoped<Payments.PaymentConfirmation>();
 
         return services;

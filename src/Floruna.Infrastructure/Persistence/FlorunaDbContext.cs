@@ -65,6 +65,8 @@ public sealed class FlorunaDbContext(DbContextOptions<FlorunaDbContext> options,
 
     public DbSet<PaymentNotification> PaymentNotifications => Set<PaymentNotification>();
 
+    public DbSet<Refund> Refunds => Set<Refund>();
+
     public DbSet<Domain.Loyalty.LoyaltyProgram> LoyaltyPrograms => Set<Domain.Loyalty.LoyaltyProgram>();
 
     public DbSet<Domain.Loyalty.LoyaltyAccount> LoyaltyAccounts => Set<Domain.Loyalty.LoyaltyAccount>();

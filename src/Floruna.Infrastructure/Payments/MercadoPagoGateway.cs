@@ -79,6 +79,18 @@ internal sealed class MercadoPagoGateway(HttpClient http) : IPaymentGateway
             Guid.TryParse(p.ExternalReference, out var orderId) ? orderId : null);
     }
 
+    public async Task<Result<GatewayRefund>> RefundAsync(string accessToken, string providerPaymentId, long amountCents, string idempotencyKey, CancellationToken cancellationToken)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Post, $"v1/payments/{Uri.EscapeDataString(providerPaymentId)}/refunds")
+        {
+            Content = JsonContent.Create(new MpRefundRequest(amountCents / 100m)),
+        };
+        message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        message.Headers.Add("X-Idempotency-Key", idempotencyKey); // retry (nosso ou do pipeline) devolve o MESMO reembolso
+        var response = await SendAsync<MpRefund>(message, cancellationToken);
+        return response.IsFailure ? response.Error : new GatewayRefund(response.Value.Id.ToString(CultureInfo.InvariantCulture));
+    }
+
     /// <summary>A tradução: o vocabulário do provedor para o nosso.</summary>
     internal static ProviderPaymentStatus Translate(string? status) => status switch
     {
@@ -96,7 +108,10 @@ internal sealed class MercadoPagoGateway(HttpClient http) : IPaymentGateway
             using var response = await http.SendAsync(message, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
-                return Error.Failure("GATEWAY_ERROR", $"Mercado Pago respondeu {(int)response.StatusCode}.");
+                // 4xx (exceto 408/429) = recusa definitiva; 5xx/408/429 = não se sabe se processou.
+                var code = (int)response.StatusCode;
+                var definitive = code is >= 400 and < 500 and not 408 and not 429;
+                return Error.Failure(definitive ? GatewayErrors.Rejected : "GATEWAY_ERROR", $"Mercado Pago respondeu {code}.");
             }
 
             return (await response.Content.ReadFromJsonAsync<T>(cancellationToken))!;
@@ -117,6 +132,10 @@ internal sealed class MercadoPagoGateway(HttpClient http) : IPaymentGateway
         [property: JsonPropertyName("external_reference")] string ExternalReference,
         [property: JsonPropertyName("statement_descriptor")] string StatementDescriptor,
         [property: JsonPropertyName("notification_url"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? NotificationUrl);
+
+    private sealed record MpRefundRequest([property: JsonPropertyName("amount")] decimal Amount);
+
+    private sealed record MpRefund([property: JsonPropertyName("id")] long Id, [property: JsonPropertyName("status")] string? Status);
 
     private sealed record MpPayer(
         [property: JsonPropertyName("email")] string Email,

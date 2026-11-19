@@ -144,6 +144,9 @@ public static class DependencyInjection
 
         // Pagamentos: repositório, cifra de segredos e o gateway com resiliência.
         services.AddScoped<IPaymentRepository, PaymentRepository>();
+        services.AddScoped<IRefundRepository, RefundRepository>();
+        services.AddScoped<IRefundQueries, RefundQueries>();
+        services.AddSingleton<RefundRetryJob>();
 
         // Fidelidade: repositório com trava da conta, leituras e o job de expiração.
         services.AddScoped<ILoyaltyRepository, Loyalty.LoyaltyRepository>();
@@ -174,6 +177,7 @@ public static class DependencyInjection
         services.AddHostedService(sp => sp.GetRequiredService<OutboxProcessor>());
         services.AddHostedService(sp => sp.GetRequiredService<AbandonedOrdersJob>());
         services.AddHostedService(sp => sp.GetRequiredService<Loyalty.LoyaltyExpiryJob>());
+        services.AddHostedService(sp => sp.GetRequiredService<RefundRetryJob>());
 
         services.AddHealthChecks().AddDbContextCheck<FlorunaDbContext>(DatabaseHealthCheckName, tags: ["ready"]);
     }

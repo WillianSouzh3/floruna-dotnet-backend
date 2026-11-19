@@ -42,7 +42,9 @@ public sealed record OrderResponse(
     string CreatedAt,
     string UpdatedAt,
     long TierDiscount,
-    long CashbackUsed)
+    long CashbackUsed,
+    string RefundStatus,
+    long RefundedAmount)
 {
     public string PaymentMethod => "pix";
 
@@ -76,7 +78,9 @@ public sealed record OrderResponse(
             CatalogMapping.Iso(o.CreatedAt),
             CatalogMapping.Iso(o.UpdatedAt),
             o.TierDiscountCents,
-            o.CashbackUsedCents);
+            o.CashbackUsedCents,
+            o.RefundStatus,
+            o.RefundedAmountCents);
     }
 }
 

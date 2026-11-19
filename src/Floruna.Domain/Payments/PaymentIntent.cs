@@ -106,6 +106,17 @@ public sealed class PaymentIntent : AggregateRoot<Guid>, ITenantOwned
 
     public DateTimeOffset? PaidAt { get; private set; }
 
+    /// <summary>Já devolvido ao comprador (confirmado).</summary>
+    public long RefundedAmountCents { get; private set; }
+
+    /// <summary>
+    /// Reembolsos EM ANDAMENTO (pedidos ao gateway sem resposta definitiva). Contam contra o
+    /// saldo reembolsável: dois reembolsos concorrentes nunca passam do valor pago.
+    /// </summary>
+    public long RefundReservedCents { get; private set; }
+
+    public long RefundableCents => Status is PaymentIntentStatus.Paid ? PaidAmountCents - RefundedAmountCents - RefundReservedCents : 0;
+
     /// <summary>
     /// Pagamento que não pôde virar pedido confirmado (ex.: pagou depois de o pedido ser
     /// cancelado por abandono). Fica marcado para a loja resolver (reembolso), NUNCA é perdido.
@@ -166,6 +177,37 @@ public sealed class PaymentIntent : AggregateRoot<Guid>, ITenantOwned
     }
 
     public void FlagReconciliationIssue(string issue) => ReconciliationIssue ??= issue;
+
+    /// <summary>Passo 1 da saga: reserva o valor (chamar com a intenção TRAVADA).</summary>
+    public Result ReserveRefund(long amountCents)
+    {
+        if (Status != PaymentIntentStatus.Paid)
+        {
+            return PaymentErrors.NotRefundable;
+        }
+
+        if (amountCents <= 0 || amountCents > RefundableCents)
+        {
+            return PaymentErrors.RefundAboveAvailable(RefundableCents);
+        }
+
+        RefundReservedCents += amountCents;
+        return Result.Success();
+    }
+
+    /// <summary>Gateway confirmou: a reserva vira reembolso. Integral → intenção reembolsada.</summary>
+    public void CompleteRefund(long amountCents)
+    {
+        RefundReservedCents -= amountCents;
+        RefundedAmountCents += amountCents;
+        if (RefundedAmountCents >= PaidAmountCents)
+        {
+            Status = PaymentIntentStatus.Refunded;
+        }
+    }
+
+    /// <summary>Gateway RECUSOU (resposta definitiva): devolve a reserva.</summary>
+    public void ReleaseRefund(long amountCents) => RefundReservedCents -= amountCents;
 
     private Result<bool> Apply(ProviderPaymentStatus status, long amountCents, DateTimeOffset now)
     {
@@ -297,7 +339,12 @@ public static class PaymentErrors
 {
     public static readonly Error IntentNotFound = Error.NotFound("NOT_FOUND", "Intenção de pagamento não encontrada.");
     public static readonly Error AlreadyPaid = Error.Conflict("CONFLICT", "Este pagamento já foi confirmado.");
+    public static readonly Error NotRefundable = Error.Conflict("CONFLICT", "Só é possível reembolsar um pedido com pagamento aprovado.");
+    public static readonly Error RefundNotFound = Error.NotFound("NOT_FOUND", "Reembolso não encontrado.");
     public static readonly Error GatewayNotAllowed = Error.Forbidden("PLAN_UPGRADE_REQUIRED", "Seu plano não inclui pagamento por gateway.");
+
+    public static Error RefundAboveAvailable(long available) => Error.Validation(
+        "VALIDATION_ERROR", $"Valor acima do disponível para reembolso (restam {available} centavos).");
 
     public static Error AmountMismatch(long expected) => Error.Validation(
         "VALIDATION_ERROR", $"O valor confirmado deve ser exatamente o total do pedido ({expected} centavos).");

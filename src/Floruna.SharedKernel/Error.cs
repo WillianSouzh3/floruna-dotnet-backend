@@ -13,6 +13,9 @@ public enum ErrorType
     Unauthorized = 4,
     Forbidden = 5,
     TooManyRequests = 6,
+
+    /// <summary>Um serviço externo (gateway) recusou ou não confirmou: 502.</summary>
+    Upstream = 7,
 }
 
 /// <summary>
@@ -45,6 +48,8 @@ public sealed record Error(string Code, string Message, ErrorType Type = ErrorTy
     public static Error Unauthorized(string code, string message) => new(code, message, ErrorType.Unauthorized);
 
     public static Error Forbidden(string code, string message) => new(code, message, ErrorType.Forbidden);
+
+    public static Error Upstream(string code, string message) => new(code, message, ErrorType.Upstream);
 
     public static Error TooManyRequests(string code, string message, int retryAfterSeconds) =>
         new(code, message, ErrorType.TooManyRequests) { RetryAfterSeconds = retryAfterSeconds };

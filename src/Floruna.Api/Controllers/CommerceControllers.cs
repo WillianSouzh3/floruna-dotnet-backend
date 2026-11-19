@@ -5,6 +5,7 @@ using Floruna.Application.Delivery;
 using Floruna.Application.Messaging;
 using Floruna.Application.Ordering;
 using Floruna.Application.Outbox;
+using Floruna.Application.Payments;
 using Floruna.Application.Promotions;
 using Floruna.Domain.Identity;
 using Floruna.Domain.Ordering;
@@ -92,7 +93,26 @@ public sealed class OrdersController(ISender sender) : ApiController
         var command = new ChangeOrderStatusCommand(id, body.Status ?? string.Empty, body.ExpectedState, body.IdempotencyKey, body.Reason, actor.UserId, actor.Role);
         return FromResult(await sender.Send(command, cancellationToken), Ok);
     }
+
+    /// <summary>
+    /// Reembolso parcial pós-venda (devolução ou cortesia). 200 = confirmado; 202 = o gateway não
+    /// respondeu de forma definitiva e o reembolso segue pendente (o job repete com a mesma chave).
+    /// </summary>
+    [HttpPost("{id:guid}/resolutions/refund")]
+    [Authorize(Roles = Roles.Admins)]
+    public async Task<IActionResult> Refund(Guid id, PartialRefundRequest body, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        var command = new PartialRefundCommand(id, body.Amount ?? 0, body.Reason,
+            body.Items?.Select(i => new RefundItemInput(i.ProductId, i.Quantity)).ToList(), body.Restock ?? false, body.IdempotencyKey, CurrentActor());
+        return FromResult(await sender.Send(command, cancellationToken),
+            result => result.Refund.Status == "pending" ? StatusCode(StatusCodes.Status202Accepted, result) : Ok(result));
+    }
 }
+
+public sealed record PartialRefundItemRequest(string? ProductId, int Quantity);
+
+public sealed record PartialRefundRequest(long? Amount, string? Reason, IReadOnlyList<PartialRefundItemRequest>? Items, bool? Restock, string? IdempotencyKey);
 
 public sealed record CouponRequest(
     string? Code, string? Type, long? Value, long? MinOrder, Optional<int?> MaxUses, Optional<int?> PerCustomerLimit,

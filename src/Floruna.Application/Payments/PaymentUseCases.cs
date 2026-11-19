@@ -18,22 +18,23 @@ public sealed record TransactionResponse(string Status, string Source, string Ac
 
 public sealed record PaymentIntentResponse(
     string Id, string OrderId, string Status, string Rail, string? ProviderPaymentId, long Amount, string Currency, long PaidAmount,
-    string? PaidAt, bool FallbackUsed, string? ReconciliationIssue, string CreatedAt)
+    string? PaidAt, bool FallbackUsed, string? ReconciliationIssue, string CreatedAt, long RefundedAmount, long RefundableAmount)
 {
     public static PaymentIntentResponse From(PaymentIntent i)
     {
         ArgumentNullException.ThrowIfNull(i);
         return new(i.Id.ToString(), i.OrderId.ToString(), PaymentContract.Status(i.Status), PaymentContract.Rail(i.Rail), i.ProviderPaymentId,
             i.AmountCents, i.Currency, i.PaidAmountCents, i.PaidAt is { } p ? CatalogMapping.Iso(p) : null, i.FallbackUsed, i.ReconciliationIssue,
-            CatalogMapping.Iso(i.CreatedAt));
+            CatalogMapping.Iso(i.CreatedAt), i.RefundedAmountCents, i.RefundableCents);
     }
 }
 
-public sealed record PaymentIntentEnvelope(PaymentIntentResponse PaymentIntent, IReadOnlyList<TransactionResponse> Transactions)
+public sealed record PaymentIntentEnvelope(PaymentIntentResponse PaymentIntent, IReadOnlyList<TransactionResponse> Transactions, IReadOnlyList<RefundResponse> Refunds)
 {
-    public static PaymentIntentEnvelope From(PaymentIntent i) => new(PaymentIntentResponse.From(i),
+    public static PaymentIntentEnvelope From(PaymentIntent i, IReadOnlyList<Refund>? refunds = null) => new(PaymentIntentResponse.From(i),
         [.. i.Transactions.Select(t => new TransactionResponse(t.Status.ToString().ToLowerInvariant(), t.Source.ToString().ToLowerInvariant(),
-            t.ActorType, t.ExternalId, t.Evidence, t.AmountCents, CatalogMapping.Iso(t.ObservedAt)))]);
+            t.ActorType, t.ExternalId, t.Evidence, t.AmountCents, CatalogMapping.Iso(t.ObservedAt)))],
+        [.. (refunds ?? []).Select(RefundResponse.From)]);
 }
 
 /// <summary>Configuração de pagamento SEM o token (só se ele está configurado).</summary>
@@ -232,13 +233,16 @@ public sealed record GetPaymentIntentQuery(Guid Id) : IQuery<PaymentIntentEnvelo
 
 public sealed record GetOrderPaymentQuery(Guid OrderId) : IQuery<PaymentIntentEnvelope>;
 
-internal sealed class PaymentQueryHandlers(IPaymentRepository payments)
+internal sealed class PaymentQueryHandlers(IPaymentRepository payments, IRefundRepository refunds)
     : IQueryHandler<GetPaymentIntentQuery, PaymentIntentEnvelope>,
       IQueryHandler<GetOrderPaymentQuery, PaymentIntentEnvelope>
 {
     public async Task<Result<PaymentIntentEnvelope>> Handle(GetPaymentIntentQuery request, CancellationToken cancellationToken) =>
-        await payments.GetAsync(request.Id, cancellationToken) is { } intent ? PaymentIntentEnvelope.From(intent) : PaymentErrors.IntentNotFound;
+        await WithRefundsAsync(await payments.GetAsync(request.Id, cancellationToken), cancellationToken);
 
     public async Task<Result<PaymentIntentEnvelope>> Handle(GetOrderPaymentQuery request, CancellationToken cancellationToken) =>
-        await payments.FindByOrderAsync(new OrderId(request.OrderId), cancellationToken) is { } intent ? PaymentIntentEnvelope.From(intent) : PaymentErrors.IntentNotFound;
+        await WithRefundsAsync(await payments.FindByOrderAsync(new OrderId(request.OrderId), cancellationToken), cancellationToken);
+
+    private async Task<Result<PaymentIntentEnvelope>> WithRefundsAsync(PaymentIntent? intent, CancellationToken cancellationToken) =>
+        intent is null ? PaymentErrors.IntentNotFound : PaymentIntentEnvelope.From(intent, await refunds.ByIntentAsync(intent.Id, cancellationToken));
 }

@@ -1107,6 +1107,15 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("pix_code");
 
+                    b.Property<string>("RefundStatus")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("refund_status");
+
+                    b.Property<long>("RefundedAmountCents")
+                        .HasColumnType("bigint")
+                        .HasColumnName("refunded_amount_cents");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -1224,6 +1233,14 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(300)")
                         .HasColumnName("reconciliation_issue");
 
+                    b.Property<long>("RefundReservedCents")
+                        .HasColumnType("bigint")
+                        .HasColumnName("refund_reserved_cents");
+
+                    b.Property<long>("RefundedAmountCents")
+                        .HasColumnType("bigint")
+                        .HasColumnName("refunded_amount_cents");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -1255,6 +1272,8 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                     b.ToTable("payment_intents", null, t =>
                         {
                             t.HasCheckConstraint("ck_payment_intents_amount_positive", "amount_cents > 0");
+
+                            t.HasCheckConstraint("ck_payment_intents_refund_within_paid", "refunded_amount_cents >= 0 AND refund_reserved_cents >= 0 AND refunded_amount_cents + refund_reserved_cents <= paid_amount_cents");
                         });
                 });
 
@@ -1342,6 +1361,121 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_payment_settings_tenant_id");
 
                     b.ToTable("payment_settings", (string)null);
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Payments.Refund", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("AmountCents")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount_cents");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<Guid>("IntentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("intent_id");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTimeOffset?>("LeaseUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_until");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("method");
+
+                    b.Property<DateTimeOffset>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("ProviderRefundId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("provider_refund_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("RequestedBy")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("requested_by");
+
+                    b.Property<bool>("Restock")
+                        .HasColumnType("boolean")
+                        .HasColumnName("restock");
+
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("scope");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_refunds");
+
+                    b.HasIndex("IntentId")
+                        .HasDatabaseName("ix_refunds_intent_id");
+
+                    b.HasIndex("NextAttemptAt")
+                        .HasDatabaseName("ix_refunds_pending_due")
+                        .HasFilter("status = 'Pending'");
+
+                    b.HasIndex("TenantId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_refunds_tenant_id_idempotency_key");
+
+                    b.HasIndex("TenantId", "IntentId")
+                        .HasDatabaseName("ix_refunds_tenant_id_intent_id");
+
+                    b.ToTable("refunds", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_refunds_amount_positive", "amount_cents > 0");
+                        });
                 });
 
             modelBuilder.Entity("Floruna.Domain.Platform.Tenant", b =>
@@ -2336,6 +2470,49 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_payment_settings_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Payments.Refund", b =>
+                {
+                    b.HasOne("Floruna.Domain.Payments.PaymentIntent", null)
+                        .WithMany()
+                        .HasForeignKey("IntentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_refunds_payment_intents_intent_id");
+
+                    b.OwnsMany("Floruna.Domain.Payments.ReturnedItem", "Items", b1 =>
+                        {
+                            b1.Property<Guid>("RefundId");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAdd();
+
+                            b1.Property<string>("Name")
+                                .IsRequired();
+
+                            b1.Property<string>("ProductId")
+                                .IsRequired();
+
+                            b1.Property<int>("Quantity");
+
+                            b1.Property<long>("UnitCostCents");
+
+                            b1.HasKey("RefundId", "__synthesizedOrdinal")
+                                .HasName("pk_refunds");
+
+                            b1.ToTable("refunds");
+
+                            b1
+                                .ToJson("items")
+                                .HasColumnType("jsonb");
+
+                            b1.WithOwner()
+                                .HasForeignKey("RefundId")
+                                .HasConstraintName("fk_refunds_refunds_refund_id");
+                        });
+
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("Floruna.Domain.Promotions.Coupon", b =>

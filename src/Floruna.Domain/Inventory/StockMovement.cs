@@ -11,6 +11,9 @@ public enum StockMovementType
     Ajuste,
     Perda,
     OpeningBalance,
+
+    /// <summary>Item devolvido pelo cliente que voltou ao estoque (reembolso com <c>restock</c>).</summary>
+    Devolucao,
 }
 
 /// <summary>

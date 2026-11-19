@@ -221,6 +221,12 @@ public sealed class Order : AggregateRoot<OrderId>, ITenantOwned
 
     public string? PaymentRail { get; private set; }
 
+    /// <summary>Contrato: <c>not_required</c>, <c>processing</c>, <c>refunded</c>, <c>failed</c> (reembolso INTEGRAL do cancelamento).</summary>
+    public string RefundStatus { get; private set; } = "not_required";
+
+    /// <summary>Cópia do total devolvido (fonte da verdade: a intenção de pagamento).</summary>
+    public long RefundedAmountCents { get; private set; }
+
     public string PixCode { get; private set; } = string.Empty;
 
     public DateTimeOffset CreatedAt { get; private set; }
@@ -343,6 +349,22 @@ public sealed class Order : AggregateRoot<OrderId>, ITenantOwned
 
         LoyaltyReversedAt = now;
         return true;
+    }
+
+    /// <summary>
+    /// Reflete o reembolso no pedido. Recebe o total ABSOLUTO lido da intenção travada (não soma
+    /// em cima do valor em memória): uma cópia velha do pedido não consegue perder um reembolso.
+    /// </summary>
+    public void RefundChanged(string refundStatus, long refundedTotalCents, bool fullyRefunded, DateTimeOffset now)
+    {
+        RefundStatus = refundStatus;
+        RefundedAmountCents = refundedTotalCents;
+        if (fullyRefunded)
+        {
+            PaymentStatus = "refunded";
+        }
+
+        UpdatedAt = now;
     }
 
     public bool IsAbandonedAt(DateTimeOffset now) => Status == OrderStatus.Pendente && now >= PaymentDeadline;

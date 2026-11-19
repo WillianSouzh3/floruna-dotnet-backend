@@ -4,6 +4,7 @@ using Floruna.Application.Messaging;
 using Floruna.Domain.Delivery;
 using Floruna.Domain.Inventory;
 using Floruna.Domain.Ordering;
+using Floruna.Domain.Payments;
 using Floruna.Domain.Promotions;
 using Floruna.SharedKernel;
 using FluentValidation;
@@ -45,12 +46,29 @@ internal sealed class ChangeOrderStatusHandler(
     IDeliveryRepository delivery,
     IUnitOfWork unitOfWork,
     ICatalogCache cache,
+    Payments.PaidOrderCancellation paidCancellation,
+    IPaymentRepository payments,
     TimeProvider clock) : ICommandHandler<ChangeOrderStatusCommand, OrderEnvelope>
 {
     public async Task<Result<OrderEnvelope>> Handle(ChangeOrderStatusCommand request, CancellationToken cancellationToken)
     {
         var target = OrderStatusContract.Parse(request.Status)!.Value;
         var expected = OrderStatusContract.Parse(request.ExpectedState);
+
+        // Pedido PAGO: o dinheiro volta ANTES do cancelamento (saga com chamada externa, fora da transação).
+        var refundedNow = false;
+        if (target == OrderStatus.Cancelado)
+        {
+            var paidBefore = await payments.FindByOrderAsync(new OrderId(request.OrderId), cancellationToken) is { Status: PaymentIntentStatus.Paid };
+            var refund = await paidCancellation.EnsureRefundedAsync(new OrderId(request.OrderId), expected, request.Reason,
+                new Domain.Audit.AuditActor(request.ActorId, request.ActorRole, null, string.Empty), cancellationToken);
+            if (refund.IsFailure)
+            {
+                return refund.Error;
+            }
+
+            refundedNow = paidBefore;
+        }
 
         var result = await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
@@ -87,6 +105,13 @@ internal sealed class ChangeOrderStatusHandler(
 
         if (result.IsFailure)
         {
+            if (refundedNow && await payments.FindByOrderAsync(new OrderId(request.OrderId), cancellationToken) is { } intent)
+            {
+                // O dinheiro já voltou, mas o cancelamento falhou: nunca some em silêncio.
+                intent.FlagReconciliationIssue("refund_completed_order_not_cancelled");
+                await unitOfWork.SaveChangesAsync(cancellationToken);
+            }
+
             return result.Error;
         }
 

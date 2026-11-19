@@ -10,7 +10,12 @@ internal sealed class PaymentIntentConfiguration : IEntityTypeConfiguration<Paym
 {
     public void Configure(EntityTypeBuilder<PaymentIntent> builder)
     {
-        builder.ToTable("payment_intents", t => t.HasCheckConstraint("ck_payment_intents_amount_positive", "amount_cents > 0"));
+        builder.ToTable("payment_intents", t =>
+        {
+            t.HasCheckConstraint("ck_payment_intents_amount_positive", "amount_cents > 0");
+            // Invariante do dinheiro, também no banco: nunca devolver (nem reservar) mais do que foi pago.
+            t.HasCheckConstraint("ck_payment_intents_refund_within_paid", "refunded_amount_cents >= 0 AND refund_reserved_cents >= 0 AND refunded_amount_cents + refund_reserved_cents <= paid_amount_cents");
+        });
         builder.HasKey(i => i.Id);
         builder.Property(i => i.Id).ValueGeneratedNever();
         builder.Property(i => i.Currency).HasMaxLength(3).IsFixedLength();
@@ -59,5 +64,26 @@ internal sealed class PaymentNotificationConfiguration : IEntityTypeConfiguratio
         builder.Property(n => n.Provider).HasMaxLength(32).IsRequired();
         builder.Property(n => n.ProviderPaymentId).HasMaxLength(64).IsRequired();
         builder.HasIndex(n => new { n.TenantId, n.ProviderPaymentId, n.ReceivedAt });
+    }
+}
+
+internal sealed class RefundConfiguration : IEntityTypeConfiguration<Refund>
+{
+    public void Configure(EntityTypeBuilder<Refund> builder)
+    {
+        builder.ToTable("refunds", t => t.HasCheckConstraint("ck_refunds_amount_positive", "amount_cents > 0"));
+        builder.HasKey(r => r.Id);
+        builder.Property(r => r.Id).ValueGeneratedNever();
+        builder.Property(r => r.Reason).HasMaxLength(500).IsRequired();
+        builder.Property(r => r.IdempotencyKey).HasMaxLength(160).IsRequired();
+        builder.Property(r => r.RequestedBy).HasMaxLength(254).IsRequired();
+        builder.Property(r => r.ProviderRefundId).HasMaxLength(64);
+        builder.Property(r => r.LastError).HasMaxLength(500);
+        builder.OwnsMany(r => r.Items, i => i.ToJson("items"));
+        builder.Navigation(r => r.Items).UsePropertyAccessMode(PropertyAccessMode.Field);
+        builder.HasIndex(r => new { r.TenantId, r.IdempotencyKey }).IsUnique(); // o mesmo pedido de reembolso nunca vira dois
+        builder.HasIndex(r => new { r.TenantId, r.IntentId });
+        builder.HasIndex(r => r.NextAttemptAt).HasFilter("status = 'Pending'").HasDatabaseName("ix_refunds_pending_due"); // job
+        builder.HasOne<PaymentIntent>().WithMany().HasForeignKey(r => r.IntentId).OnDelete(DeleteBehavior.Restrict);
     }
 }

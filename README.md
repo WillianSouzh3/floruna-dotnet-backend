@@ -70,6 +70,7 @@ docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 dotnet 
 | POST | `/api/v1/orders` (checkout; login opcional; `useCashback` exige sessão) · GET `/orders/{id}?token=` | público (rate-limited) |
 | GET | `/api/v1/orders` (filtros: `status`, `search`, `minTotal`, `maxTotal`) · PATCH `/orders/{id}/status` | admin |
 | GET | `/api/v1/orders/me` | cliente |
+| POST | `/api/v1/orders/{id}/resolutions/refund` (reembolso parcial; 202 se pendente) | admin |
 | GET · POST · PUT · DELETE | `/api/v1/coupons` · GET `/coupons/validate?code=&subtotal=&email=` (público) | admin |
 | GET · POST · PUT · DELETE | `/api/v1/delivery-zones` · GET `/delivery-zones/quote?cep=` (público) | admin |
 | GET · POST · PATCH · DELETE | `/api/v1/delivery-capacity` · POST `/delivery-promises/quote` (público) | admin |
@@ -124,5 +125,6 @@ Configuração inválida impede a API de subir (fail-fast).
 | 4 | Checkout + Pedido + Outbox: cupons, zonas e capacidade de entrega, checkout transacional e idempotente, estados, abandonados, outbox com DLQ | ✅ |
 | 5 | Pagamentos: BR Code PIX, Mercado Pago com resiliência, webhook verificado, confirmação manual, token cifrado | ✅ |
 | 6a | Fidelidade: cashback com razão de lotes, níveis, resgate no checkout com trava, acúmulo/estorno pela outbox, expiração | ✅ |
-| 6b–d | Reembolsos, oficinas, PDV + caixa | |
+| 6b | Reembolsos: saga com o gateway, recusa x resultado desconhecido, retentativa idempotente, cancelamento de pago, devolução ao estoque | ✅ |
+| 6c–d | Oficinas, PDV + caixa | |
 | 7 | Produção na AWS (ECS Fargate, RDS, Secrets Manager, CDK) | |

@@ -34,6 +34,7 @@ public static class ApiResponses
         ErrorType.NotFound => StatusCodes.Status404NotFound,
         ErrorType.Conflict => StatusCodes.Status409Conflict,
         ErrorType.TooManyRequests => StatusCodes.Status429TooManyRequests,
+        ErrorType.Upstream => StatusCodes.Status502BadGateway,
         _ => StatusCodes.Status422UnprocessableEntity,
     };
 

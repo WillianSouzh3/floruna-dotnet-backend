@@ -19,7 +19,21 @@ public sealed class FakeMercadoPago : HttpMessageHandler
     private readonly ConcurrentDictionary<long, (string Status, decimal Amount, string ExternalReference)> _payments = new();
     private long _nextId = 1_000;
 
+    private readonly ConcurrentDictionary<string, long> _refundsByKey = new();
+    private long _refundedCents;
+
     public bool Down { get; set; }
+
+    /// <summary>Recusa reembolsos com 400 (definitivo).</summary>
+    public bool RejectRefunds { get; set; }
+
+    /// <summary>Processa o reembolso mas a resposta "se perde" (504): o pior caso, resultado desconhecido.</summary>
+    public bool LoseRefundResponses { get; set; }
+
+    /// <summary>Reembolsos EFETIVAMENTE executados (uma vez por chave de idempotência).</summary>
+    public int RefundsExecuted => _refundsByKey.Count;
+
+    public long RefundedCents => Interlocked.Read(ref _refundedCents);
 
     public int Calls;
 
@@ -51,6 +65,24 @@ public sealed class FakeMercadoPago : HttpMessageHandler
             var id = Interlocked.Increment(ref _nextId);
             _payments[id] = ("pending", root.GetProperty("transaction_amount").GetDecimal(), root.GetProperty("external_reference").GetString()!);
             return Json(new { id, status = "pending", point_of_interaction = new { transaction_data = new { qr_code = $"00020101MP{id}" } } });
+        }
+
+        if (request.Method == HttpMethod.Post && path.EndsWith("/refunds", StringComparison.Ordinal))
+        {
+            if (RejectRefunds)
+            {
+                return new HttpResponseMessage(HttpStatusCode.BadRequest);
+            }
+
+            using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellationToken));
+            var key = request.Headers.GetValues("X-Idempotency-Key").Single();
+            var amountCents = (long)(body.RootElement.GetProperty("amount").GetDecimal() * 100);
+            var refundId = _refundsByKey.GetOrAdd(key, _ =>
+            {
+                Interlocked.Add(ref _refundedCents, amountCents); // mesma chave: o MP devolve o mesmo reembolso, sem pagar de novo
+                return Interlocked.Increment(ref _nextId);
+            });
+            return LoseRefundResponses ? new HttpResponseMessage(HttpStatusCode.GatewayTimeout) : Json(new { id = refundId, status = "approved" });
         }
 
         if (request.Method == HttpMethod.Get && path.StartsWith("/v1/payments/", StringComparison.Ordinal)
