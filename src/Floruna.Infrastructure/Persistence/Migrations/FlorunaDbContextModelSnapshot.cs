@@ -1712,6 +1712,147 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                     b.ToTable("coupon_redemptions", (string)null);
                 });
 
+            modelBuilder.Entity("Floruna.Domain.Workshops.Workshop", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Capacity")
+                        .HasColumnType("integer")
+                        .HasColumnName("capacity");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Date")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("date");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(5000)
+                        .HasColumnType("character varying(5000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Image")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("image");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Location")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("location");
+
+                    b.Property<long>("PriceCents")
+                        .HasColumnType("bigint")
+                        .HasColumnName("price_cents");
+
+                    b.Property<int>("Registered")
+                        .HasColumnType("integer")
+                        .HasColumnName("registered");
+
+                    b.Property<string>("ShortDescription")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("short_description");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("slug");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_workshops");
+
+                    b.HasIndex("TenantId", "Slug")
+                        .IsUnique()
+                        .HasDatabaseName("ix_workshops_tenant_id_slug");
+
+                    b.HasIndex("TenantId", "IsActive", "CreatedAt")
+                        .HasDatabaseName("ix_workshops_tenant_id_is_active_created_at");
+
+                    b.ToTable("workshops", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_workshops_price_not_negative", "price_cents >= 0");
+
+                            t.HasCheckConstraint("ck_workshops_registered_within_capacity", "registered >= 0 AND registered <= capacity");
+                        });
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Workshops.WorkshopRegistration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("email");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("phone");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("WorkshopId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workshop_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_workshop_registrations");
+
+                    b.HasIndex("WorkshopId")
+                        .HasDatabaseName("ix_workshop_registrations_workshop_id");
+
+                    b.HasIndex("TenantId", "WorkshopId", "CreatedAt")
+                        .HasDatabaseName("ix_workshop_registrations_tenant_id_workshop_id_created_at");
+
+                    b.ToTable("workshop_registrations", (string)null);
+                });
+
             modelBuilder.Entity("Floruna.Infrastructure.Outbox.OutboxMessage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2533,6 +2674,26 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_coupon_redemptions_coupons_coupon_id");
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Workshops.Workshop", b =>
+                {
+                    b.HasOne("Floruna.Domain.Platform.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_workshops_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Workshops.WorkshopRegistration", b =>
+                {
+                    b.HasOne("Floruna.Domain.Workshops.Workshop", null)
+                        .WithMany()
+                        .HasForeignKey("WorkshopId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_workshop_registrations_workshops_workshop_id");
                 });
 
             modelBuilder.Entity("Floruna.Domain.Inventory.StockItem", b =>

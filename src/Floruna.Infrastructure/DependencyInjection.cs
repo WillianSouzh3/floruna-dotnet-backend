@@ -145,6 +145,8 @@ public static class DependencyInjection
         // Pagamentos: repositório, cifra de segredos e o gateway com resiliência.
         services.AddScoped<IPaymentRepository, PaymentRepository>();
         services.AddScoped<IRefundRepository, RefundRepository>();
+        services.AddScoped<Domain.Workshops.IWorkshopRepository, Workshops.WorkshopRepository>();
+        services.AddScoped<Application.Workshops.IWorkshopQueries, Workshops.WorkshopQueries>();
         services.AddScoped<IRefundQueries, RefundQueries>();
         services.AddSingleton<RefundRetryJob>();
 

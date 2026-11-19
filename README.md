@@ -80,6 +80,8 @@ docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 dotnet 
 | GET · POST | `/api/v1/payments/intents?orderId=` · `/intents/{id}` · `/intents/{id}/confirm-manual` | admin |
 | GET · PUT | `/api/v1/loyalty/program` · GET `/loyalty/accounts` · `/loyalty/liability` · POST `/loyalty/accounts/{id}/adjust` | admin (plano Pro+) |
 | GET | `/api/v1/loyalty/me` · `/loyalty/me/statement` | cliente |
+| GET | `/api/v1/events` · `/events/{slug}` · POST `/events/{id}/registrations` | público |
+| POST · PUT · DELETE | `/api/v1/events` · GET `/events/{id}/registrations` | admin |
 | GET | `/api/v1/health`, `/health/live`, `/health/ready` | público |
 
 A loja vem do header `x-tenant-host` (enviado pelo BFF) ou do `Host`: `flora-lis.localhost:3000` → loja `flora-lis`.
@@ -126,5 +128,6 @@ Configuração inválida impede a API de subir (fail-fast).
 | 5 | Pagamentos: BR Code PIX, Mercado Pago com resiliência, webhook verificado, confirmação manual, token cifrado | ✅ |
 | 6a | Fidelidade: cashback com razão de lotes, níveis, resgate no checkout com trava, acúmulo/estorno pela outbox, expiração | ✅ |
 | 6b | Reembolsos: saga com o gateway, recusa x resultado desconhecido, retentativa idempotente, cancelamento de pago, devolução ao estoque | ✅ |
-| 6c–d | Oficinas, PDV + caixa | |
+| 6c | Oficinas: vagas atômicas (UPDATE condicional + inscrição na mesma transação), CHECK no banco | ✅ |
+| 6d | PDV + caixa | |
 | 7 | Produção na AWS (ECS Fargate, RDS, Secrets Manager, CDK) | |
