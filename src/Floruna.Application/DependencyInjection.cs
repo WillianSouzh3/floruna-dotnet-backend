@@ -41,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<Payments.PaymentInitializer>();
         services.AddScoped<Loyalty.CheckoutLoyalty>();
         services.AddScoped<Payments.RefundSaga>();
+        services.AddScoped<Ordering.OrderItemPricer>();
         services.AddScoped<Payments.PaidOrderCancellation>();
         services.AddScoped<Payments.PaymentConfirmation>();
 

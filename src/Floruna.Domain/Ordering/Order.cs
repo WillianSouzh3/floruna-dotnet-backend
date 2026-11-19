@@ -65,6 +65,22 @@ public sealed record OrderTotals(long SubtotalCents, long DiscountCents, long De
     public long TotalCents => SubtotalCents - DiscountCents + DeliveryFeeCents + GiftCardFeeCents - CashbackUsedCents;
 }
 
+/// <summary>Uma parcela do pagamento no balcão (pagamento dividido). Contrato: <c>dinheiro, pix, cartao_debito, cartao_credito, outro</c>.</summary>
+public sealed record PosPayment(string Method, long AmountCents)
+{
+    public static readonly IReadOnlySet<string> Methods = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "dinheiro", "pix", "cartao_debito", "cartao_credito", "outro",
+    };
+
+    public const string Cash = "dinheiro";
+}
+
+/// <param name="CashSessionId">Caixa aberto do operador; null = venda sem caixa (entra no relatório, não na conferência).</param>
+public sealed record PosPlacement(
+    TenantId TenantId, string? IdempotencyKey, CustomerContact Customer, IReadOnlyList<OrderItem> Items, long DiscountCents,
+    IReadOnlyList<PosPayment> Payments, Guid OperatorId, Guid? CashSessionId);
+
 public sealed record OrderPlacement(
     TenantId TenantId,
     string? IdempotencyKey,
@@ -104,6 +120,7 @@ public sealed class Order : AggregateRoot<OrderId>, ITenantOwned
 
     private readonly List<OrderItem> _items = [];
     private readonly List<StatusChange> _history = [];
+    private readonly List<PosPayment> _payments = [];
 
     private Order()
         : base(default)
@@ -229,6 +246,21 @@ public sealed class Order : AggregateRoot<OrderId>, ITenantOwned
 
     public string PixCode { get; private set; } = string.Empty;
 
+    /// <summary>Contrato: <c>online</c> (vitrine) ou <c>pdv</c> (balcão).</summary>
+    public string Origin { get; private set; } = "online";
+
+    /// <summary>Contrato: <c>pix</c> no online; no balcão, a forma usada ou <c>multiplo</c>.</summary>
+    public string PaymentMethod { get; private set; } = "pix";
+
+    public IReadOnlyList<PosPayment> Payments => _payments.AsReadOnly();
+
+    public Guid? OperatorId { get; private set; }
+
+    public Guid? CashSessionId { get; private set; }
+
+    /// <summary>Parte paga em DINHEIRO (desnormalizada para a conferência do caixa somar por índice).</summary>
+    public long CashReceivedCents { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -266,6 +298,48 @@ public sealed class Order : AggregateRoot<OrderId>, ITenantOwned
         order._history.Add(new StatusChange(null, OrderStatus.Pendente, now, placement.CustomerId, "customer", "Pedido criado", null));
         order.Raise(new OrderPlaced(id, placement.TenantId, now));
         return (order, token);
+    }
+
+    /// <summary>
+    /// Venda no balcão (PDV não fiscal): o cliente leva na hora, então o pedido já nasce PAGO e
+    /// ENTREGUE. A soma das formas de pagamento precisa bater com o total, centavo a centavo.
+    /// </summary>
+    public static Result<(Order Order, string AccessToken)> PlacePos(OrderId id, PosPlacement p, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(p);
+        if (p.Payments.Count is 0 or > 5 || p.Payments.Any(x => !PosPayment.Methods.Contains(x.Method) || x.AmountCents < 0))
+        {
+            return Error.Validation("VALIDATION_ERROR", "Formas de pagamento inválidas (1 a 5, valores não negativos).");
+        }
+
+        var subtotal = p.Items.Sum(i => i.LineTotalCents);
+        var totals = new OrderTotals(subtotal, p.DiscountCents, 0, 0);
+        var paid = p.Payments.Sum(x => x.AmountCents);
+        if (p.Items.Count > 0 && p.DiscountCents <= subtotal && totals.TotalCents > 0 && paid != totals.TotalCents)
+        {
+            return Error.Validation("VALIDATION_ERROR", $"A soma das formas de pagamento ({paid}) não bate com o total ({totals.TotalCents}).");
+        }
+
+        var placed = Place(id, new OrderPlacement(p.TenantId, p.IdempotencyKey, p.Customer, null, p.Items, totals, DeliveryMethod.Retirada,
+            null, null, null, null, null, null, null, null, SubstitutionMode.Exact), now);
+        if (placed.IsFailure)
+        {
+            return placed;
+        }
+
+        var order = placed.Value.Order;
+        order.Origin = "pdv";
+        order._payments.AddRange(p.Payments);
+        order.PaymentMethod = p.Payments.Count == 1 ? p.Payments[0].Method : "multiplo";
+        order.CashReceivedCents = p.Payments.Where(x => x.Method == PosPayment.Cash).Sum(x => x.AmountCents);
+        order.OperatorId = p.OperatorId;
+        order.CashSessionId = p.CashSessionId;
+        order.PaymentStatus = "approved";
+        order.PaymentInitializationStatus = "ready";
+        order.Status = OrderStatus.Entregue;
+        order._history.Clear();
+        order._history.Add(new StatusChange(null, OrderStatus.Entregue, now, p.OperatorId, "pdv", "Venda no balcão", null));
+        return placed;
     }
 
     /// <summary>Comparação em tempo constante: o tempo de resposta não ajuda a adivinhar o token.</summary>

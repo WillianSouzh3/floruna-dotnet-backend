@@ -71,6 +71,8 @@ public sealed class FlorunaDbContext(DbContextOptions<FlorunaDbContext> options,
 
     public DbSet<Domain.Workshops.WorkshopRegistration> WorkshopRegistrations => Set<Domain.Workshops.WorkshopRegistration>();
 
+    public DbSet<Domain.Pos.CashSession> CashSessions => Set<Domain.Pos.CashSession>();
+
     public DbSet<Domain.Loyalty.LoyaltyProgram> LoyaltyPrograms => Set<Domain.Loyalty.LoyaltyProgram>();
 
     public DbSet<Domain.Loyalty.LoyaltyAccount> LoyaltyAccounts => Set<Domain.Loyalty.LoyaltyAccount>();

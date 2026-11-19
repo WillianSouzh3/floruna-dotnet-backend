@@ -71,6 +71,7 @@ docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 dotnet 
 | GET | `/api/v1/orders` (filtros: `status`, `search`, `minTotal`, `maxTotal`) · PATCH `/orders/{id}/status` | admin |
 | GET | `/api/v1/orders/me` | cliente |
 | POST | `/api/v1/orders/{id}/resolutions/refund` (reembolso parcial; 202 se pendente) | admin |
+| POST | `/api/v1/orders/pos` (venda de balcão) · GET `/cash-sessions/current` · POST `/cash-sessions/open` · `/movement` · `/close` · GET `/cash-sessions` | PDV (plano Pro+) |
 | GET · POST · PUT · DELETE | `/api/v1/coupons` · GET `/coupons/validate?code=&subtotal=&email=` (público) | admin |
 | GET · POST · PUT · DELETE | `/api/v1/delivery-zones` · GET `/delivery-zones/quote?cep=` (público) | admin |
 | GET · POST · PATCH · DELETE | `/api/v1/delivery-capacity` · POST `/delivery-promises/quote` (público) | admin |
@@ -129,5 +130,5 @@ Configuração inválida impede a API de subir (fail-fast).
 | 6a | Fidelidade: cashback com razão de lotes, níveis, resgate no checkout com trava, acúmulo/estorno pela outbox, expiração | ✅ |
 | 6b | Reembolsos: saga com o gateway, recusa x resultado desconhecido, retentativa idempotente, cancelamento de pago, devolução ao estoque | ✅ |
 | 6c | Oficinas: vagas atômicas (UPDATE condicional + inscrição na mesma transação), CHECK no banco | ✅ |
-| 6d | PDV + caixa | |
+| 6d | PDV + caixa: venda de balcão com pagamento dividido, caixa com conferência, venda x fechamento serializados por trava | ✅ |
 | 7 | Produção na AWS (ECS Fargate, RDS, Secrets Manager, CDK) | |

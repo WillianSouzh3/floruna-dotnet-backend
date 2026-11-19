@@ -57,7 +57,7 @@ internal sealed partial class PlaceOrderValidator : AbstractValidator<PlaceOrder
 internal sealed class PlaceOrderHandler(
     ITenantContext tenantContext,
     IOrderRepository orders,
-    ICatalogRepository catalog,
+    OrderItemPricer pricer,
     IInventoryRepository inventory,
     ICouponRepository coupons,
     IDeliveryRepository delivery,
@@ -84,7 +84,7 @@ internal sealed class PlaceOrderHandler(
         }
 
         // 2. Itens com preço DO CATÁLOGO e snapshot (RN-40, RN-43).
-        var items = await PriceItemsAsync(input.Items!, cancellationToken);
+        var items = await pricer.PriceAsync(input.Items!, cancellationToken);
         if (items.IsFailure)
         {
             return items.Error;
@@ -231,7 +231,29 @@ internal sealed class PlaceOrderHandler(
         return true;
     }
 
-    private async Task<Result<List<OrderItem>>> PriceItemsAsync(IReadOnlyList<OrderItemInput> requested, CancellationToken cancellationToken)
+    private static SubstitutionMode ParseSubstitution(string? value) => value switch
+    {
+        "exact" => SubstitutionMode.Exact,
+        "preapproved" => SubstitutionMode.Preapproved,
+        _ => SubstitutionMode.AskMe, // padrão: perguntar antes (nunca substituir em silêncio)
+    };
+}
+
+/// <summary>Chaves determinísticas: a reserva do item N do pedido X é sempre a mesma.</summary>
+public static class ReservationKeys
+{
+    public static string For(OrderId orderId, int itemIndex) => $"order:{orderId}:{itemIndex}";
+
+    public static string Sale(OrderId orderId, int itemIndex) => $"sale:{orderId}:{itemIndex}";
+}
+
+/// <summary>
+/// Preço DO CATÁLOGO e snapshot de cada item (RN-40, RN-43). Usado pelo checkout online e pelo
+/// PDV: o cliente (ou o operador) nunca informa preço.
+/// </summary>
+public sealed class OrderItemPricer(ICatalogRepository catalog)
+{
+    public async Task<Result<List<OrderItem>>> PriceAsync(IReadOnlyList<OrderItemInput> requested, CancellationToken cancellationToken)
     {
         var items = new List<OrderItem>(requested.Count);
         foreach (var line in requested)
@@ -266,18 +288,4 @@ internal sealed class PlaceOrderHandler(
         return items;
     }
 
-    private static SubstitutionMode ParseSubstitution(string? value) => value switch
-    {
-        "exact" => SubstitutionMode.Exact,
-        "preapproved" => SubstitutionMode.Preapproved,
-        _ => SubstitutionMode.AskMe, // padrão: perguntar antes (nunca substituir em silêncio)
-    };
-}
-
-/// <summary>Chaves determinísticas: a reserva do item N do pedido X é sempre a mesma.</summary>
-public static class ReservationKeys
-{
-    public static string For(OrderId orderId, int itemIndex) => $"order:{orderId}:{itemIndex}";
-
-    public static string Sale(OrderId orderId, int itemIndex) => $"sale:{orderId}:{itemIndex}";
 }

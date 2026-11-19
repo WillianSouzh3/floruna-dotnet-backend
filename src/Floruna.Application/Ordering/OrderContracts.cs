@@ -46,9 +46,15 @@ public sealed record OrderResponse(
     string RefundStatus,
     long RefundedAmount)
 {
-    public string PaymentMethod => "pix";
+    public string PaymentMethod { get; init; } = "pix";
 
-    public string Origin => "online";
+    public string Origin { get; init; } = "online";
+
+    /// <summary>Formas de pagamento do balcão (vazio no online).</summary>
+    public IReadOnlyList<PosPaymentResponse> Payments { get; init; } = [];
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? CashSessionId { get; init; }
 
     public IReadOnlyList<object> ExtraFields => [];
 
@@ -80,9 +86,17 @@ public sealed record OrderResponse(
             o.TierDiscountCents,
             o.CashbackUsedCents,
             o.RefundStatus,
-            o.RefundedAmountCents);
+            o.RefundedAmountCents)
+        {
+            PaymentMethod = o.PaymentMethod,
+            Origin = o.Origin,
+            Payments = [.. o.Payments.Select(p => new PosPaymentResponse(p.Method, p.AmountCents))],
+            CashSessionId = internalView ? o.CashSessionId?.ToString() : null,
+        };
     }
 }
+
+public sealed record PosPaymentResponse(string Method, long Amount);
 
 public sealed record OrderEnvelope(OrderResponse Order);
 

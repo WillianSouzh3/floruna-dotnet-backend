@@ -147,6 +147,8 @@ public static class DependencyInjection
         services.AddScoped<IRefundRepository, RefundRepository>();
         services.AddScoped<Domain.Workshops.IWorkshopRepository, Workshops.WorkshopRepository>();
         services.AddScoped<Application.Workshops.IWorkshopQueries, Workshops.WorkshopQueries>();
+        services.AddScoped<Domain.Pos.ICashSessionRepository, Pos.CashSessionRepository>();
+        services.AddScoped<Application.Pos.ICashSessionQueries, Pos.CashSessionQueries>();
         services.AddScoped<IRefundQueries, RefundQueries>();
         services.AddSingleton<RefundRetryJob>();
 

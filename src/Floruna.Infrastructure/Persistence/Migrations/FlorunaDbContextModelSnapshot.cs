@@ -1011,6 +1011,14 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("access_token_hash");
 
+                    b.Property<long>("CashReceivedCents")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cash_received_cents");
+
+                    b.Property<Guid?>("CashSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cash_session_id");
+
                     b.Property<long>("CashbackUsedCents")
                         .HasColumnType("bigint")
                         .HasColumnName("cashback_used_cents");
@@ -1084,6 +1092,16 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("loyalty_reversed_at");
 
+                    b.Property<Guid?>("OperatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operator_id");
+
+                    b.Property<string>("Origin")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("origin");
+
                     b.Property<DateTimeOffset>("PaymentDeadline")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("payment_deadline");
@@ -1092,6 +1110,12 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("payment_initialization_status");
+
+                    b.Property<string>("PaymentMethod")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("payment_method");
 
                     b.Property<string>("PaymentRail")
                         .HasColumnType("text")
@@ -1150,6 +1174,10 @@ namespace Floruna.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_orders");
+
+                    b.HasIndex("CashSessionId")
+                        .HasDatabaseName("ix_orders_cash_session_id")
+                        .HasFilter("cash_session_id IS NOT NULL");
 
                     b.HasIndex("PaymentDeadline")
                         .HasDatabaseName("ix_orders_pending_payment_deadline")
@@ -1580,6 +1608,73 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_tenants_slug");
 
                     b.ToTable("tenants", (string)null);
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Pos.CashSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("closed_at");
+
+                    b.Property<long?>("CountedCash")
+                        .HasColumnType("bigint")
+                        .HasColumnName("counted_cash");
+
+                    b.Property<long?>("Difference")
+                        .HasColumnType("bigint")
+                        .HasColumnName("difference");
+
+                    b.Property<long?>("ExpectedCashAtClose")
+                        .HasColumnType("bigint")
+                        .HasColumnName("expected_cash_at_close");
+
+                    b.Property<DateTimeOffset>("OpenedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("opened_at");
+
+                    b.Property<long>("OpeningFloatCents")
+                        .HasColumnType("bigint")
+                        .HasColumnName("opening_float_cents");
+
+                    b.Property<Guid>("OperatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operator_id");
+
+                    b.Property<string>("OperatorName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("operator_name");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_cash_sessions");
+
+                    b.HasIndex("TenantId", "OperatorId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_cash_sessions_one_open_per_operator")
+                        .HasFilter("status = 'Open'");
+
+                    b.HasIndex("TenantId", "Status", "ClosedAt")
+                        .HasDatabaseName("ix_cash_sessions_tenant_id_status_closed_at");
+
+                    b.ToTable("cash_sessions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_cash_sessions_float_not_negative", "opening_float_cents >= 0");
+                        });
                 });
 
             modelBuilder.Entity("Floruna.Domain.Promotions.Coupon", b =>
@@ -2490,6 +2585,32 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                                 .HasConstraintName("fk_orders_orders_order_id");
                         });
 
+                    b.OwnsMany("Floruna.Domain.Ordering.PosPayment", "Payments", b1 =>
+                        {
+                            b1.Property<Guid>("OrderId");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAdd();
+
+                            b1.Property<long>("AmountCents");
+
+                            b1.Property<string>("Method")
+                                .IsRequired();
+
+                            b1.HasKey("OrderId", "__synthesizedOrdinal")
+                                .HasName("pk_orders");
+
+                            b1.ToTable("orders");
+
+                            b1
+                                .ToJson("payments")
+                                .HasColumnType("jsonb");
+
+                            b1.WithOwner()
+                                .HasForeignKey("OrderId")
+                                .HasConstraintName("fk_orders_orders_order_id");
+                        });
+
                     b.OwnsMany("Floruna.Domain.Ordering.StatusChange", "History", b1 =>
                         {
                             b1.Property<Guid>("OrderId");
@@ -2540,6 +2661,8 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                     b.Navigation("History");
 
                     b.Navigation("Items");
+
+                    b.Navigation("Payments");
                 });
 
             modelBuilder.Entity("Floruna.Domain.Payments.PaymentIntent", b =>
@@ -2654,6 +2777,53 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                         });
 
                     b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Pos.CashSession", b =>
+                {
+                    b.HasOne("Floruna.Domain.Platform.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_cash_sessions_tenants_tenant_id");
+
+                    b.OwnsMany("Floruna.Domain.Pos.CashMovement", "Movements", b1 =>
+                        {
+                            b1.Property<Guid>("CashSessionId");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAdd();
+
+                            b1.Property<long>("AmountCents");
+
+                            b1.Property<DateTimeOffset>("At");
+
+                            b1.Property<string>("By")
+                                .IsRequired();
+
+                            b1.Property<string>("Reason")
+                                .IsRequired();
+
+                            b1.Property<string>("Type")
+                                .IsRequired()
+                                .HasMaxLength(32);
+
+                            b1.HasKey("CashSessionId", "__synthesizedOrdinal")
+                                .HasName("pk_cash_sessions");
+
+                            b1.ToTable("cash_sessions");
+
+                            b1
+                                .ToJson("movements")
+                                .HasColumnType("jsonb");
+
+                            b1.WithOwner()
+                                .HasForeignKey("CashSessionId")
+                                .HasConstraintName("fk_cash_sessions_cash_sessions_cash_session_id");
+                        });
+
+                    b.Navigation("Movements");
                 });
 
             modelBuilder.Entity("Floruna.Domain.Promotions.Coupon", b =>

@@ -106,12 +106,17 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.OwnsOne(o => o.GiftCard, g => g.ToJson("gift_card"));
         builder.OwnsMany(o => o.Items, i => i.ToJson("items"));
         builder.OwnsMany(o => o.History, h => h.ToJson("status_history"));
+        builder.OwnsMany(o => o.Payments, p => p.ToJson("payments"));
+        builder.Navigation(o => o.Payments).UsePropertyAccessMode(PropertyAccessMode.Field);
+        builder.Property(o => o.Origin).HasMaxLength(10).IsRequired();
+        builder.Property(o => o.PaymentMethod).HasMaxLength(20).IsRequired();
         builder.Navigation(o => o.Items).UsePropertyAccessMode(PropertyAccessMode.Field);
         builder.Navigation(o => o.History).UsePropertyAccessMode(PropertyAccessMode.Field);
 
         builder.HasIndex(o => new { o.TenantId, o.IdempotencyKey }).IsUnique().HasFilter("idempotency_key IS NOT NULL");
         builder.HasIndex(o => new { o.TenantId, o.Status, o.CreatedAt });
         builder.HasIndex(o => new { o.TenantId, o.CustomerId, o.CreatedAt });
+        builder.HasIndex(o => o.CashSessionId).HasFilter("cash_session_id IS NOT NULL"); // conferência do caixa
         // Job de abandonados (todas as lojas): só os pendentes, por prazo.
         builder.HasIndex(o => o.PaymentDeadline).HasFilter("status = 'Pendente'").HasDatabaseName("ix_orders_pending_payment_deadline");
         builder.HasOne<Tenant>().WithMany().HasForeignKey(o => o.TenantId).OnDelete(DeleteBehavior.Restrict);

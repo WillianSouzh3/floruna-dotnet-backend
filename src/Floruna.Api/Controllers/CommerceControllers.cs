@@ -94,6 +94,20 @@ public sealed class OrdersController(ISender sender) : ApiController
         return FromResult(await sender.Send(command, cancellationToken), Ok);
     }
 
+    /// <summary>Venda no balcão (PDV não fiscal): pedido já pago e entregue, com baixa de estoque.</summary>
+    [HttpPost("pos")]
+    [Authorize(Roles = Roles.PointOfSale)]
+    [RequiresPlanFeature(Domain.Platform.PlanFeature.Pdv)]
+    public async Task<IActionResult> PosSale(PosSaleRequest body, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        var command = new Application.Pos.PlacePosSaleCommand(
+            body.Items?.Select(i => new OrderItemInput(i.ProductId, i.Quantity, i.VariantLabel)).ToList(),
+            body.Payments?.Select(p => new Application.Pos.PosPaymentInput(p.Method, p.Amount)).ToList(),
+            body.Discount, body.CustomerName, body.CustomerPhone, body.IdempotencyKey, CurrentActor());
+        return FromResult(await sender.Send(command, cancellationToken), o => StatusCode(StatusCodes.Status201Created, o));
+    }
+
     /// <summary>
     /// Reembolso parcial pós-venda (devolução ou cortesia). 200 = confirmado; 202 = o gateway não
     /// respondeu de forma definitiva e o reembolso segue pendente (o job repete com a mesma chave).
@@ -109,6 +123,12 @@ public sealed class OrdersController(ISender sender) : ApiController
             result => result.Refund.Status == "pending" ? StatusCode(StatusCodes.Status202Accepted, result) : Ok(result));
     }
 }
+
+public sealed record PosPaymentRequest(string? Method, long Amount);
+
+public sealed record PosSaleRequest(
+    IReadOnlyList<OrderItemRequest>? Items, IReadOnlyList<PosPaymentRequest>? Payments, long? Discount, string? CustomerName, string? CustomerPhone,
+    string? IdempotencyKey);
 
 public sealed record PartialRefundItemRequest(string? ProductId, int Quantity);
 
