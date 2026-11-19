@@ -55,6 +55,7 @@ public sealed partial class RefundSaga(
     ISecretProtector secrets,
     IAuditRepository audit,
     IUnitOfWork unitOfWork,
+    Telemetry.FlorunaMetrics metrics,
     TimeProvider clock,
     ILogger<RefundSaga> logger)
 {
@@ -135,7 +136,9 @@ public sealed partial class RefundSaga(
         }
 
         var outcome = await CallGatewayAsync(refund, cancellationToken);
-        return await FinishAsync(refund.Id, refund.IntentId, outcome, actor, cancellationToken);
+        var finished = await FinishAsync(refund.Id, refund.IntentId, outcome, actor, cancellationToken);
+        metrics.Refund(outcome.Kind switch { OutcomeKind.Succeeded => "succeeded", OutcomeKind.Rejected => "failed", _ => "deferred" });
+        return finished;
     }
 
     private async Task<Outcome> CallGatewayAsync(Refund refund, CancellationToken cancellationToken)

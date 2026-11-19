@@ -43,6 +43,12 @@ internal sealed class OutboxMessage
     public string? LastError { get; set; }
 
     public DateTimeOffset? ProcessedAt { get; set; }
+
+    /// <summary>
+    /// W3C <c>traceparent</c> de quem gerou o evento. O processamento assíncrono continua o MESMO trace:
+    /// no painel, o e-mail enviado pelo worker aparece debaixo do checkout que o causou.
+    /// </summary>
+    public string? TraceParent { get; set; }
 }
 
 /// <summary>
@@ -69,6 +75,7 @@ internal sealed class OutboxMessageConfiguration : IEntityTypeConfiguration<Outb
         builder.Property(m => m.Type).HasMaxLength(200).IsRequired();
         builder.Property(m => m.Payload).HasColumnType("jsonb").IsRequired();
         builder.Property(m => m.LastError).HasMaxLength(2000);
+        builder.Property(m => m.TraceParent).HasMaxLength(64);
         // O processador busca por estado + vencimento: índice parcial só do que falta processar.
         builder.HasIndex(m => new { m.State, m.NextAttemptAt }).HasFilter("state IN ('Pending', 'Processing')");
         builder.HasIndex(m => new { m.TenantId, m.OccurredAt });
@@ -132,6 +139,7 @@ internal sealed class DomainEventsToOutboxInterceptor(TimeProvider clock) : Save
                     OccurredAt = domainEvent.OccurredAt,
                     State = OutboxState.Pending,
                     NextAttemptAt = clock.GetUtcNow(),
+                    TraceParent = System.Diagnostics.Activity.Current?.Id,
                 });
             }
 

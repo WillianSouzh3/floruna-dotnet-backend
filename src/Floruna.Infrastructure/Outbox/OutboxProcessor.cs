@@ -30,7 +30,13 @@ namespace Floruna.Infrastructure.Outbox;
 /// handlers (<c>INotificationHandler&lt;DomainEventNotification&lt;T&gt;&gt;</c>); adicionar um efeito
 /// novo não muda este arquivo (Open/Closed; no Nest o worker injetava 13 dependências, dívida M3).</para>
 /// </remarks>
-internal sealed partial class OutboxProcessor(IServiceScopeFactory scopes, TimeProvider clock, Microsoft.Extensions.Options.IOptions<BackgroundJobsOptions> options, ILogger<OutboxProcessor> logger)
+internal sealed partial class OutboxProcessor(
+    IServiceScopeFactory scopes,
+    TimeProvider clock,
+    Microsoft.Extensions.Options.IOptions<BackgroundJobsOptions> options,
+    Application.Telemetry.FlorunaMetrics metrics,
+    Application.Telemetry.OutboxHealth health,
+    ILogger<OutboxProcessor> logger)
     : BackgroundService
 {
     public const int MaxAttempts = 10;
@@ -53,6 +59,7 @@ internal sealed partial class OutboxProcessor(IServiceScopeFactory scopes, TimeP
             try
             {
                 await ProcessOnceAsync(stoppingToken);
+                await SampleHealthAsync(stoppingToken);
             }
 #pragma warning disable CA1031 // um ciclo com erro não pode matar o processador
             catch (Exception ex) when (ex is not OperationCanceledException)
@@ -80,6 +87,22 @@ internal sealed partial class OutboxProcessor(IServiceScopeFactory scopes, TimeP
         return done;
     }
 
+    /// <summary>
+    /// Amostra a saúde da fila para os gauges (idade da mais antiga pendente, pendentes, mortas). Uma consulta
+    /// por ciclo, no worker: o callback do gauge só lê o valor guardado, sem I/O.
+    /// </summary>
+    public async Task SampleHealthAsync(CancellationToken cancellationToken)
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<FlorunaDbContext>();
+        var now = clock.GetUtcNow();
+        var oldest = await db.OutboxMessages.Where(m => m.State == OutboxState.Pending || m.State == OutboxState.Processing)
+            .MinAsync(m => (DateTimeOffset?)m.OccurredAt, cancellationToken);
+        health.OldestPendingAgeSeconds = oldest is { } o ? Math.Max(0, (now - o).TotalSeconds) : 0;
+        health.Pending = await db.OutboxMessages.LongCountAsync(m => m.State == OutboxState.Pending || m.State == OutboxState.Processing, cancellationToken);
+        health.DeadLetters = await db.OutboxMessages.LongCountAsync(m => m.State == OutboxState.Dead, cancellationToken);
+    }
+
     private async Task<List<ClaimedMessage>> ClaimAsync(CancellationToken cancellationToken)
     {
         await using var scope = scopes.CreateAsyncScope();
@@ -95,16 +118,24 @@ internal sealed partial class OutboxProcessor(IServiceScopeFactory scopes, TimeP
                 ORDER BY occurred_at
                 LIMIT {BatchSize}
                 FOR UPDATE SKIP LOCKED)
-            RETURNING id, tenant_id, type, payload, attempts
+            RETURNING id, tenant_id, type, payload, attempts, trace_parent
             """).ToListAsync(cancellationToken);
     }
 
     private async Task<bool> ProcessAsync(ClaimedMessage message, CancellationToken cancellationToken)
     {
+        // Continua o trace de quem gerou o evento (o checkout, por exemplo): consumidor da "fila".
+        System.Diagnostics.ActivityContext.TryParse(message.TraceParent, null, out var parent);
+        using var activity = Application.Telemetry.FlorunaTelemetry.Source.StartActivity(
+            $"outbox {message.Type[(message.Type.LastIndexOf('.') + 1)..]}", System.Diagnostics.ActivityKind.Consumer, parent);
+        activity?.SetTag("messaging.system", "outbox");
+        activity?.SetTag("messaging.message.id", message.Id.ToString());
+        activity?.SetTag("floruna.outbox.attempt", message.Attempts);
         try
         {
             await DispatchAsync(message, cancellationToken);
             await UpdateAsync($"UPDATE outbox_messages SET state = 'Processed', processed_at = {clock.GetUtcNow()}, locked_until = NULL, last_error = NULL WHERE id = {message.Id}", cancellationToken);
+            metrics.OutboxMessage("processed");
             return true;
         }
 #pragma warning disable CA1031 // qualquer falha de handler vira retry/DLQ, nunca derruba o lote
@@ -112,13 +143,16 @@ internal sealed partial class OutboxProcessor(IServiceScopeFactory scopes, TimeP
 #pragma warning restore CA1031
         {
             var error = ex.Message.Length > 2000 ? ex.Message[..2000] : ex.Message;
+            activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Error, error);
             if (message.Attempts >= MaxAttempts)
             {
+                metrics.OutboxMessage("dead");
                 LogDeadLettered(logger, ex, message.Id, message.Type, message.Attempts);
                 await UpdateAsync($"UPDATE outbox_messages SET state = 'Dead', locked_until = NULL, last_error = {error} WHERE id = {message.Id}", cancellationToken);
             }
             else
             {
+                metrics.OutboxMessage("retry");
                 var delay = TimeSpan.FromSeconds(Math.Min(3600, 30 * Math.Pow(2, message.Attempts - 1)));
                 LogRetry(logger, message.Id, message.Type, message.Attempts, delay.TotalSeconds);
                 var next = clock.GetUtcNow() + delay;
@@ -198,7 +232,7 @@ internal sealed partial class OutboxProcessor(IServiceScopeFactory scopes, TimeP
         await scope.ServiceProvider.GetRequiredService<FlorunaDbContext>().Database.ExecuteSqlAsync(sql, cancellationToken);
     }
 
-    internal sealed record ClaimedMessage(Guid Id, Guid TenantId, string Type, string Payload, int Attempts);
+    internal sealed record ClaimedMessage(Guid Id, Guid TenantId, string Type, string Payload, int Attempts, string? TraceParent);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Outbox: mensagem {MessageId} ({Type}) foi para a fila de mortas após {Attempts} tentativas")]
     private static partial void LogDeadLettered(ILogger logger, Exception exception, Guid messageId, string type, int attempts);

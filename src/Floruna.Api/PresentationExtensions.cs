@@ -60,6 +60,7 @@ internal static class PresentationExtensions
         services.AddSingleton<IAuthorizationMiddlewareResultHandler, ApiAuthorizationResultHandler>();
         services.AddFlorunaRateLimiting(configuration);
         services.AddTrustedProxies(configuration);
+        services.AddObservability(configuration);
         services.AddSingleton<ProcessInfo>();
         services.AddOpenApi("v1");
 

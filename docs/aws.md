@@ -100,7 +100,7 @@ num deploy seguinte remover a antiga.
 | Deploy ruim | O circuit breaker reverte sozinho se as tasks não ficam saudáveis. Para voltar uma versão saudável mas errada: *Re-run* do workflow do commit anterior (tags imutáveis garantem a mesma imagem). |
 | Migration falhou | O pipeline parou antes da app. Leia o log do grupo `MigratorLogs`, corrija com uma migration NOVA (nunca edite uma aplicada). |
 | Restaurar o banco | PITR do RDS para um horário (cria instância nova) → atualize o campo `host` do segredo `floruna/<env>/database` → force novo deploy dos serviços. |
-| Investigar erro | CloudWatch Logs Insights nos grupos `api`/`worker`: logs em JSON, filtre por `RequestId` (o mesmo `X-Request-ID` da resposta). |
+| Investigar erro | Peça ao cliente o `X-Trace-Id` da resposta e abra o trace no X-Ray (inclui o processamento assíncrono). Nos logs (Logs Insights, JSON), filtre pelo mesmo `TraceId`. |
 | Pico (Dia das Mães) | Autoscaling já cobre até `ApiMaxTasks`. Antecipe subindo `ApiMinTasks` no dia anterior. |
 | Mensagens na fila de mortas | `GET /api/v1/platform/outbox?state=dead` (superadmin) e `POST .../retry`. |
 
@@ -108,7 +108,7 @@ num deploy seguinte remover a antiga.
 
 | Pilar | Como está atendido |
 |---|---|
-| **Excelência operacional** | IaC testada (asserções + cdk-nag no CI); deploy automatizado com migrations antes da app; logs estruturados; runbooks acima. |
+| **Excelência operacional** | IaC testada (asserções + cdk-nag no CI); deploy automatizado com migrations antes da app; logs estruturados; traces no X-Ray (sidecar ADOT) que atravessam a outbox; runbooks acima. |
 | **Segurança** | Banco em subnet isolada, SG só a partir das tasks; segredos no Secrets Manager e injetados pelo ECS; cifra em repouso (RDS, S3) e em trânsito (TLS 1.2+ no ALB, TLS no banco); WAF; OIDC sem chave de acesso; tags de imagem imutáveis com scan; menor privilégio (migrator só vê o banco); `X-Forwarded-For` só aceito da VPC; flow logs de tráfego rejeitado. |
 | **Confiabilidade** | Multi-AZ (RDS standby síncrono, tasks em 3 AZs, um NAT por AZ em prod); health check com o banco; circuit breaker; backups com PITR (14 dias) e snapshot na exclusão; outbox com retry/DLQ; jobs seguros com várias réplicas. |
 | **Eficiência de performance** | Target tracking (CPU 60% e 1000 req/task); `api` e `worker` escalam separados (bulkhead); Graviton; pool de conexões dimensionado. |
@@ -142,5 +142,5 @@ economiza ~US$ 110/mês.
 - **TLS do banco** em `Require` (cifra, mas não valida o certificado). `VerifyFull` exige o bundle de CAs do RDS na imagem.
 - **Data Protection** do ASP.NET com chaves efêmeras por task (a API não usa hoje; viraria problema com cookies/antiforgery).
 - **Superadmin inicial** em produção: hoje via seed (variáveis `Seed__*`). Falta um comando `seed` avulso, com a senha lida do Secrets Manager.
-- Métrica customizada da fila de mortas da outbox (EMF) com alarme; tracing distribuído (OpenTelemetry/X-Ray).
+- Alarmes nas métricas da outbox (`floruna.outbox.oldest_pending_age`, `dead_letters`), publicadas via EMF pelo coletor ADOT.
 - CloudFront na frente (cache de vitrine, Shield Standard na borda); multi-região (DR) com réplica cross-region.

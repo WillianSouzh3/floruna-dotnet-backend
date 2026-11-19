@@ -67,6 +67,7 @@ internal sealed class PlaceOrderHandler(
     Payments.PaymentInitializer paymentInitializer,
     Loyalty.CheckoutLoyalty loyalty,
     ILoyaltyRepository loyaltyAccounts,
+    Telemetry.FlorunaMetrics metrics,
     TimeProvider clock) : ICommandHandler<PlaceOrderCommand, OrderEnvelope>
 {
     public async Task<Result<OrderEnvelope>> Handle(PlaceOrderCommand request, CancellationToken cancellationToken)
@@ -173,6 +174,7 @@ internal sealed class PlaceOrderHandler(
         }
 
         await cache.InvalidateAsync(cancellationToken); // disponibilidade da vitrine mudou
+        metrics.OrderPlaced("online", order.TotalCents);
 
         // Cobrança DEPOIS do commit: a chamada ao gateway nunca segura a transação (RN-42).
         await paymentInitializer.InitializeAsync(order.Id, cancellationToken);

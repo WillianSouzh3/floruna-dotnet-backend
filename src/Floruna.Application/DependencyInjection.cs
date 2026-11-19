@@ -42,6 +42,8 @@ public static class DependencyInjection
         services.AddScoped<Loyalty.CheckoutLoyalty>();
         services.AddScoped<Payments.RefundSaga>();
         services.AddScoped<Ordering.OrderItemPricer>();
+        services.AddSingleton<Telemetry.OutboxHealth>();
+        services.AddSingleton<Telemetry.FlorunaMetrics>();
         services.AddScoped<Substitutions.SubstitutionApplier>();
         services.AddScoped<Payments.PaidOrderCancellation>();
         services.AddScoped<Payments.PaymentConfirmation>();

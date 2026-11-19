@@ -78,7 +78,7 @@ public sealed class ProductionInfrastructureTests(ProductionFixture prod) : ICla
     [Fact]
     public void Secrets_reach_the_tasks_only_through_secrets_manager()
     {
-        foreach (var container in Containers(prod.App).Concat(Containers(prod.Migration)))
+        foreach (var container in AppContainers(prod.App).Concat(Containers(prod.Migration)))
         {
             var names = Names(container, "Environment");
             names.ShouldNotContain(n => n.Contains("Password", StringComparison.OrdinalIgnoreCase)
@@ -91,7 +91,7 @@ public sealed class ProductionInfrastructureTests(ProductionFixture prod) : ICla
     [Fact]
     public void One_image_three_roles_api_worker_and_migrator()
     {
-        var containers = Containers(prod.App).Concat(Containers(prod.Migration)).ToDictionary(c => c.GetProperty("Name").GetString()!);
+        var containers = AppContainers(prod.App).Concat(Containers(prod.Migration)).ToDictionary(c => c.GetProperty("Name").GetString()!);
 
         EnvValue(containers["api"], "BackgroundJobs__Enabled").ShouldBe("false");
         EnvValue(containers["worker"], "BackgroundJobs__Enabled").ShouldBe("true");
@@ -106,9 +106,27 @@ public sealed class ProductionInfrastructureTests(ProductionFixture prod) : ICla
     [Fact]
     public void Migrator_lives_in_its_own_stack_so_it_runs_before_the_app_rolls()
     {
-        Containers(prod.App).Select(c => c.GetProperty("Name").GetString()).ShouldBe(["api", "worker"], ignoreOrder: true);
+        AppContainers(prod.App).Select(c => c.GetProperty("Name").GetString()).ShouldBe(["api", "worker"], ignoreOrder: true);
         prod.Stacks.App.Dependencies.ShouldNotContain(prod.Stacks.Migration); // o pipeline decide a ordem, não um acoplamento entre pilhas
         prod.Migration.ResourceCountIs("AWS::ECS::Cluster", 1);
+    }
+
+    [Fact]
+    public void Api_and_worker_ship_telemetry_through_a_non_essential_adot_sidecar()
+    {
+        foreach (var task in Resources(Json(prod.App), "AWS::ECS::TaskDefinition"))
+        {
+            var containers = task.GetProperty("ContainerDefinitions").EnumerateArray().ToList();
+            var collector = containers.Where(c => c.GetProperty("Name").GetString() == "otel-collector").ShouldHaveSingleItem();
+            collector.GetProperty("Essential").GetBoolean().ShouldBeFalse(); // telemetria caindo não derruba vendas
+            collector.GetProperty("Image").GetString()!.ShouldStartWith("public.ecr.aws/aws-observability/aws-otel-collector:v");
+
+            var app = containers.Single(c => c.GetProperty("Name").GetString() != "otel-collector");
+            EnvValue(app, "OTEL_EXPORTER_OTLP_ENDPOINT").ShouldBe("http://localhost:4317");
+        }
+
+        var policies = Resources(Json(prod.App), "AWS::IAM::Policy").Select(p => p.GetProperty("PolicyDocument").ToString());
+        policies.ShouldContain(p => p.Contains("xray:PutTraceSegments", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -227,6 +245,10 @@ public sealed class ProductionInfrastructureTests(ProductionFixture prod) : ICla
         template.GetProperty("Resources").EnumerateObject()
             .Where(r => r.Value.GetProperty("Type").GetString() == type)
             .Select(r => r.Value.TryGetProperty("Properties", out var p) ? p : default);
+
+    /// <summary>Containers da aplicação (sem o sidecar de telemetria).</summary>
+    private static IEnumerable<JsonElement> AppContainers(Template template) =>
+        Containers(template).Where(c => c.GetProperty("Name").GetString() != "otel-collector");
 
     private static IEnumerable<JsonElement> Containers(Template template) =>
         Resources(Json(template), "AWS::ECS::TaskDefinition").SelectMany(t => t.GetProperty("ContainerDefinitions").EnumerateArray());

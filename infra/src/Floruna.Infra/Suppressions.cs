@@ -43,7 +43,7 @@ internal static class Suppressions
         [
             new NagPackSuppression { Id = "AwsSolutions-ECS2", Reason = "Variáveis de ambiente só com configuração NÃO secreta; segredos vão por 'secrets' (Secrets Manager), coberto por teste." },
             new NagPackSuppression { Id = "AwsSolutions-S1", Reason = "Bucket de access logs do ALB não precisa de log de acesso de si mesmo (recursão)." },
-            new NagPackSuppression { Id = "AwsSolutions-IAM5", Reason = "Curingas gerados pelo CDK: ecr:GetAuthorizationToken (não aceita recurso), logs no log group da própria task e a limpeza do bucket de staging (autoDeleteObjects)." },
+            new NagPackSuppression { Id = "AwsSolutions-IAM5", Reason = "Curingas gerados pelo CDK: ecr:GetAuthorizationToken (não aceita recurso), logs no log group da própria task e a limpeza do bucket de staging (autoDeleteObjects). Coletor ADOT: ações do X-Ray não aceitam recurso; métricas EMF restritas ao prefixo /aws/ecs/application/metrics." },
         ]);
     }
 }

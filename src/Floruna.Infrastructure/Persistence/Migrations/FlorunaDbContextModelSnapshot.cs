@@ -2373,6 +2373,11 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
 
+                    b.Property<string>("TraceParent")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("trace_parent");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(200)

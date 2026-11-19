@@ -28,6 +28,7 @@ namespace Floruna.Infra.Stacks;
 public sealed class AppStack : Stack
 {
     private const int ContainerPort = 4000;
+    private const string CollectorVersion = "v0.51.0";
 
     public AppStack(Construct scope, string id, FlorunaEnvironment env, IVpc vpc, ISecurityGroup appSecurityGroup, ISecurityGroup albSecurityGroup, DataStack data, IRepository repository, IStackProps props)
         : base(scope, id, props)
@@ -50,11 +51,12 @@ public sealed class AppStack : Stack
         {
             Image = image,
             Logging = Logs("api", env),
-            Environment = EnvironmentVariables(env, vpc, backgroundJobs: false),
+            Environment = EnvironmentVariables(env, vpc, backgroundJobs: false, serviceName: "floruna-api"),
             Secrets = secrets,
             PortMappings = [new PortMapping { ContainerPort = ContainerPort }],
             StopTimeout = Duration.Seconds(30), // SIGTERM → o ASP.NET termina as requisições em andamento
         });
+        AddTelemetryCollector(apiTask, "api", env);
         var api = new FargateService(this, "ApiService", new FargateServiceProps
         {
             Cluster = cluster,
@@ -76,10 +78,11 @@ public sealed class AppStack : Stack
         {
             Image = image,
             Logging = Logs("worker", env),
-            Environment = EnvironmentVariables(env, vpc, backgroundJobs: true),
+            Environment = EnvironmentVariables(env, vpc, backgroundJobs: true, serviceName: "floruna-worker"),
             Secrets = secrets,
             StopTimeout = Duration.Seconds(60), // termina o lote da outbox em andamento
         });
+        AddTelemetryCollector(workerTask, "worker", env);
         _ = new FargateService(this, "WorkerService", new FargateServiceProps
         {
             Cluster = cluster,
@@ -175,6 +178,36 @@ public sealed class AppStack : Stack
         RuntimePlatform = new RuntimePlatform { CpuArchitecture = CpuArchitecture.ARM64, OperatingSystemFamily = OperatingSystemFamily.LINUX },
     });
 
+    /// <summary>
+    /// Sidecar do AWS Distro for OpenTelemetry: recebe OTLP da aplicação e envia traces ao X-Ray e métricas
+    /// ao CloudWatch (EMF). NÃO essencial: se o coletor cair, a aplicação continua atendendo (perde telemetria,
+    /// não vendas).
+    /// </summary>
+    private void AddTelemetryCollector(FargateTaskDefinition task, string role, FlorunaEnvironment env)
+    {
+        task.AddContainer($"{role}-otel-collector", new ContainerDefinitionOptions
+        {
+            ContainerName = "otel-collector",
+            Image = ContainerImage.FromRegistry($"public.ecr.aws/aws-observability/aws-otel-collector:{CollectorVersion}"),
+            Command = ["--config=/etc/ecs/ecs-default-config.yaml"], // OTLP → X-Ray + CloudWatch EMF
+            Essential = false,
+            MemoryReservationMiB = 64,
+            Logging = Logs($"{role}-otel", env),
+        });
+        task.AddToTaskRolePolicy(new Amazon.CDK.AWS.IAM.PolicyStatement(new Amazon.CDK.AWS.IAM.PolicyStatementProps
+        {
+            Sid = "XRayTraces",
+            Actions = ["xray:PutTraceSegments", "xray:PutTelemetryRecords", "xray:GetSamplingRules", "xray:GetSamplingTargets", "xray:GetSamplingStatisticSummaries"],
+            Resources = ["*"], // o X-Ray não aceita recurso nessas ações
+        }));
+        task.AddToTaskRolePolicy(new Amazon.CDK.AWS.IAM.PolicyStatement(new Amazon.CDK.AWS.IAM.PolicyStatementProps
+        {
+            Sid = "EmbeddedMetrics",
+            Actions = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents", "logs:DescribeLogStreams", "logs:DescribeLogGroups"],
+            Resources = [$"arn:aws:logs:{Region}:{Account}:log-group:/aws/ecs/application/metrics*"],
+        }));
+    }
+
     private LogDriver Logs(string role, FlorunaEnvironment env) => LogDriver.AwsLogs(new AwsLogDriverProps
     {
         StreamPrefix = role,
@@ -186,10 +219,14 @@ public sealed class AppStack : Stack
     });
 
     /// <summary>Configuração NÃO secreta. Nada aqui é senha: segredos vão em <see cref="Secrets"/>.</summary>
-    private static Dictionary<string, string> EnvironmentVariables(FlorunaEnvironment env, IVpc vpc, bool backgroundJobs)
+    private static Dictionary<string, string> EnvironmentVariables(FlorunaEnvironment env, IVpc vpc, bool backgroundJobs, string serviceName)
     {
         var variables = new Dictionary<string, string>
         {
+            // OpenTelemetry → coletor ADOT no MESMO task (sidecar, localhost): a app não conhece X-Ray nem CloudWatch.
+            ["OTEL_EXPORTER_OTLP_ENDPOINT"] = "http://localhost:4317",
+            ["OTEL_EXPORTER_OTLP_PROTOCOL"] = "grpc",
+            ["OTEL_SERVICE_NAME"] = serviceName,
             ["ASPNETCORE_ENVIRONMENT"] = "Production",
             ["Logging__Console__FormatterName"] = "json", // uma linha JSON por log: consultável no Logs Insights
             ["BackgroundJobs__Enabled"] = backgroundJobs ? "true" : "false",

@@ -6,6 +6,10 @@ using Floruna.Infrastructure.Persistence;
 // Composition root: o ÚNICO lugar que conhece todas as camadas.
 var builder = WebApplication.CreateBuilder(args);
 
+// Toda linha de log leva o TraceId/SpanId do trace atual: do log se chega ao trace, e vice-versa.
+builder.Logging.Configure(options => options.ActivityTrackingOptions =
+    ActivityTrackingOptions.TraceId | ActivityTrackingOptions.SpanId | ActivityTrackingOptions.ParentId);
+
 builder.Services
     .AddApplication()
     .AddInfrastructure(builder.Configuration)

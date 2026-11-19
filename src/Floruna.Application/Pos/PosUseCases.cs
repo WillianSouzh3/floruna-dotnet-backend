@@ -57,6 +57,7 @@ internal sealed class PlacePosSaleHandler(
     IAuditRepository audit,
     IUnitOfWork unitOfWork,
     ICatalogCache cache,
+    Telemetry.FlorunaMetrics metrics,
     TimeProvider clock) : ICommandHandler<PlacePosSaleCommand, OrderEnvelope>
 {
     public async Task<Result<OrderEnvelope>> Handle(PlacePosSaleCommand request, CancellationToken cancellationToken)
@@ -124,6 +125,7 @@ internal sealed class PlacePosSaleHandler(
         }
 
         await cache.InvalidateAsync(cancellationToken);
+        metrics.OrderPlaced("pdv", written.Value.TotalCents);
         return new OrderEnvelope(OrderResponse.From(written.Value, internalView: true));
     }
 }

@@ -121,6 +121,7 @@ public sealed partial class PaymentConfirmation(
     IOrderRepository orders,
     ISender sender,
     IUnitOfWork unitOfWork,
+    Telemetry.FlorunaMetrics metrics,
     TimeProvider clock,
     ILogger<PaymentConfirmation> logger)
 {
@@ -146,6 +147,8 @@ public sealed partial class PaymentConfirmation(
             await unitOfWork.SaveChangesAsync(cancellationToken);
             return intent;
         }
+
+        metrics.PaymentConfirmed(intent.Transactions[^1].Source.ToString().ToLowerInvariant());
 
         // Passo 1: a mudança da intenção (em memória) e a confirmação do pedido vão no MESMO commit.
         order?.PaymentStatusChanged("approved", now);

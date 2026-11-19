@@ -21,7 +21,7 @@ internal sealed partial class TenantResolutionMiddleware(RequestDelegate next)
 {
     public const string TenantHostHeader = "x-tenant-host";
 
-    public async Task InvokeAsync(HttpContext context, ITenantResolver resolver, TenantContext tenantContext)
+    public async Task InvokeAsync(HttpContext context, ITenantResolver resolver, TenantContext tenantContext, ILogger<TenantResolutionMiddleware> logger)
     {
         ArgumentNullException.ThrowIfNull(context);
         var path = context.Request.Path.Value ?? string.Empty;
@@ -48,6 +48,15 @@ internal sealed partial class TenantResolutionMiddleware(RequestDelegate next)
             }
 
             tenantContext.Set(tenant);
+            System.Diagnostics.Activity.Current?.SetTag("floruna.tenant", tenant.Slug);
+
+            // RNF-08: toda linha de log desta requisição carrega a loja (o slug: o id não diz nada a quem lê).
+            using (logger.BeginScope(new Dictionary<string, object> { ["Tenant"] = tenant.Slug }))
+            {
+                await next(context);
+            }
+
+            return;
         }
 
         await next(context);

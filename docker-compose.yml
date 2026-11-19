@@ -31,6 +31,10 @@ services:
       AUTH_SECRET: ${AUTH_SECRET:-dev-only-secret-change-me-0123456789abcdef}
       Jwt__Secret: ""
       Platform__Domain: localhost
+      # Telemetria: vazio = só coleta, sem exportar. Com o perfil "observability", aponte para o painel.
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_SERVICE_NAME: floruna-api
       # Seed de desenvolvimento: loja flora-lis + usuário master.
       Seed__AdminEmail: admin@floraelis.com.br
       Seed__AdminPassword: ${SEED_ADMIN_PASSWORD:-troque-esta-senha-local}
@@ -52,6 +56,17 @@ services:
     profiles: ["mail"]
     ports:
       - "8025:8025"
+
+  aspire-dashboard:
+    # Painel local de traces, métricas e logs (OTLP). Suba com:
+    #   OTEL_EXPORTER_OTLP_ENDPOINT=http://aspire-dashboard:18889 docker compose --profile observability up
+    # e abra http://localhost:18888
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:13.6.5
+    profiles: ["observability"]
+    environment:
+      DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true" # só local
+    ports:
+      - "18888:18888"
 
 volumes:
   pgdata:

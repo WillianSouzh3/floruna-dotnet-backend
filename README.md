@@ -121,6 +121,16 @@ curl -X POST localhost:4000/api/v1/auth/admin/login -H 'x-tenant-host: flora-lis
 
 Configuração inválida impede a API de subir (fail-fast).
 
+## Observabilidade
+
+```bash
+OTEL_EXPORTER_OTLP_ENDPOINT=http://aspire-dashboard:18889 docker compose --profile observability up --build
+# painel: http://localhost:18888 (traces, métricas, logs)
+```
+
+Toda resposta traz `X-Trace-Id`: com ele se acha a requisição inteira no painel, inclusive o que a outbox fez depois.
+Métricas de negócio no medidor `Floruna` (`floruna.orders.*`, `floruna.outbox.*`...). Detalhes: ADR 0014.
+
 ## Infraestrutura (AWS)
 
 CDK em C# em `infra/` (precisa de Node.js 22 e .NET 8+). Guia completo: [docs/aws.md](docs/aws.md).
@@ -150,4 +160,5 @@ A imagem também roda como migrator: `docker run <imagem> migrate` aplica as mig
 | 6d | PDV + caixa: venda de balcão com pagamento dividido, caixa com conferência, venda x fechamento serializados por trava | ✅ |
 | 6e | Pedido personalizado: orçamento versionado com máquina de estados, link com token, conversão única, concorrência por trava | ✅ |
 | 6f | Substituição com consentimento: modo do pedido congelado, tolerância da política, link com prazo, aplicação única com estoque travado | ✅ |
+| 6g | Observabilidade: OpenTelemetry (traces que atravessam a outbox, métricas de negócio, saúde da fila), `X-Trace-Id`, Aspire Dashboard local, ADOT na AWS | ✅ |
 | 7 | Produção na AWS com CDK (C#): ECS Fargate api/worker/migrator, RDS Multi-AZ, Secrets Manager, ALB + WAF, alarmes, deploy via GitHub OIDC. Ver [docs/aws.md](docs/aws.md) | ✅ (pronta, não implantada) |

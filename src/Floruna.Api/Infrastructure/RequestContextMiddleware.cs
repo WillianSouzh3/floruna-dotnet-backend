@@ -18,6 +18,8 @@ internal sealed partial class RequestContextMiddleware(RequestDelegate next)
 {
     public const string RequestIdHeader = "X-Request-ID";
 
+    public const string TraceIdHeader = "X-Trace-Id";
+
     public Task InvokeAsync(HttpContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -28,6 +30,15 @@ internal sealed partial class RequestContextMiddleware(RequestDelegate next)
 
         var headers = context.Response.Headers;
         headers[RequestIdHeader] = requestId;
+
+        // O ID do trace volta para o cliente: o suporte recebe esse código e acha o caminho INTEIRO da
+        // requisição (incluindo o que a outbox fez depois) no painel de traces.
+        if (System.Diagnostics.Activity.Current is { } activity)
+        {
+            headers[TraceIdHeader] = activity.TraceId.ToString();
+            activity.SetTag("floruna.request_id", requestId);
+        }
+
         headers["X-API-Version"] = ApiVersion.Current;
         headers.XContentTypeOptions = "nosniff";
         headers.XFrameOptions = "DENY";
