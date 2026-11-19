@@ -35,12 +35,14 @@ public sealed record OrderResponse(
     string Status,
     IReadOnlyList<StatusHistoryResponse> StatusHistory,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? AccessToken,
+    string PaymentStatus,
+    string PaymentInitializationStatus,
+    string? PaymentRail,
+    string PixCode,
     string CreatedAt,
     string UpdatedAt)
 {
     public string PaymentMethod => "pix";
-
-    public string PaymentStatus => "pending"; // Fase 5 (pagamentos)
 
     public string Origin => "online";
 
@@ -65,6 +67,10 @@ public sealed record OrderResponse(
             [.. o.History.Select(h => new StatusHistoryResponse(h.From is { } f ? OrderStatusContract.ToContract(f) : null,
                 OrderStatusContract.ToContract(h.To), CatalogMapping.Iso(h.At), h.ActorRole, h.Reason))],
             accessToken,
+            o.PaymentStatus,
+            o.PaymentInitializationStatus,
+            o.PaymentRail,
+            o.PixCode,
             CatalogMapping.Iso(o.CreatedAt),
             CatalogMapping.Iso(o.UpdatedAt));
     }

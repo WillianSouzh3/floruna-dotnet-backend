@@ -32,6 +32,9 @@ public sealed record Error(string Code, string Message, ErrorType Type = ErrorTy
     /// <summary>Representa "nenhum erro" dentro de um <see cref="Result"/> de sucesso.</summary>
     public static readonly Error None = new(string.Empty, string.Empty);
 
+    /// <summary>Falha de regra ou de integração que não é de validação nem de permissão (vira 422).</summary>
+    public static Error Failure(string code, string message) => new(code, message, ErrorType.Failure);
+
     public static Error Validation(string code, string message, IReadOnlyList<string>? issues = null) =>
         new(code, message, ErrorType.Validation) { Issues = issues ?? [] };
 

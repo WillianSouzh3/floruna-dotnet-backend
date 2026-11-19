@@ -61,6 +61,7 @@ internal sealed class PlaceOrderHandler(
     DeliveryResolver deliveryResolver,
     IUnitOfWork unitOfWork,
     ICatalogCache cache,
+    Payments.PaymentInitializer paymentInitializer,
     TimeProvider clock) : ICommandHandler<PlaceOrderCommand, OrderEnvelope>
 {
     public async Task<Result<OrderEnvelope>> Handle(PlaceOrderCommand request, CancellationToken cancellationToken)
@@ -149,6 +150,9 @@ internal sealed class PlaceOrderHandler(
         }
 
         await cache.InvalidateAsync(cancellationToken); // disponibilidade da vitrine mudou
+
+        // Cobrança DEPOIS do commit: a chamada ao gateway nunca segura a transação (RN-42).
+        await paymentInitializer.InitializeAsync(order.Id, cancellationToken);
         return new OrderEnvelope(OrderResponse.From(order, internalView: false, accessToken));
     }
 

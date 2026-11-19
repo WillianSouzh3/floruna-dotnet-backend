@@ -7,6 +7,7 @@ using Floruna.Domain.Delivery;
 using Floruna.Domain.Identity;
 using Floruna.Domain.Inventory;
 using Floruna.Domain.Ordering;
+using Floruna.Domain.Payments;
 using Floruna.Domain.Platform;
 using Floruna.Domain.Promotions;
 using Floruna.SharedKernel;
@@ -57,6 +58,12 @@ public sealed class FlorunaDbContext(DbContextOptions<FlorunaDbContext> options,
     public DbSet<CapacityRule> CapacityRules => Set<CapacityRule>();
 
     public DbSet<Order> Orders => Set<Order>();
+
+    public DbSet<PaymentIntent> PaymentIntents => Set<PaymentIntent>();
+
+    public DbSet<PaymentSettings> PaymentSettings => Set<PaymentSettings>();
+
+    public DbSet<PaymentNotification> PaymentNotifications => Set<PaymentNotification>();
 
     internal DbSet<Configurations.DeliverySlotUsage> DeliverySlotUsage => Set<Configurations.DeliverySlotUsage>();
 

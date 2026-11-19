@@ -12,6 +12,9 @@ public sealed class PlatformSettings
     public string DefaultTenantSlug { get; set; } = "flora-lis";
 
     public TimeSpan CacheTtl { get; set; } = TimeSpan.FromSeconds(60);
+
+    /// <summary>URL pública da API (para o gateway chamar o webhook). Vazio = sem webhook (só confirmação manual/polling).</summary>
+    public string ApiPublicUrl { get; set; } = string.Empty;
 }
 
 public sealed class AuthenticationSettings

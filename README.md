@@ -74,6 +74,9 @@ docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 dotnet 
 | GET · POST · PUT · DELETE | `/api/v1/delivery-zones` · GET `/delivery-zones/quote?cep=` (público) | admin |
 | GET · POST · PATCH · DELETE | `/api/v1/delivery-capacity` · POST `/delivery-promises/quote` (público) | admin |
 | GET · POST | `/api/v1/platform/outbox?state=dead` · `/platform/outbox/{id}/retry` | superadmin |
+| GET · PUT | `/api/v1/settings/payments` (token do gateway só escrita) | admin |
+| POST | `/api/v1/payments/webhook?tenant={slug}` | público (sempre 200; verify-by-fetch) |
+| GET · POST | `/api/v1/payments/intents?orderId=` · `/intents/{id}` · `/intents/{id}/confirm-manual` | admin |
 | GET | `/api/v1/health`, `/health/live`, `/health/ready` | público |
 
 A loja vem do header `x-tenant-host` (enviado pelo BFF) ou do `Host`: `flora-lis.localhost:3000` → loja `flora-lis`.
@@ -100,6 +103,9 @@ curl -X POST localhost:4000/api/v1/auth/admin/login -H 'x-tenant-host: flora-lis
 | `Network:TrustedProxies` | `Network__TrustedProxies__0` | `10.0.0.0/16` (VPC do ALB) |
 | `Seed:SuperAdminEmail` / `SuperAdminPassword` | `Seed__SuperAdminEmail` | superadmin de dev |
 | `Cors:AllowedOrigins` | `Cors__AllowedOrigins__0` | `http://localhost:3000` |
+| `Secrets:EncryptionKey` | `Secrets__EncryptionKey` | 32 bytes base64 (`openssl rand -base64 32`), **obrigatória** |
+| `Platform:ApiPublicUrl` | `Platform__ApiPublicUrl` | URL pública da API (webhook do gateway) |
+| `MercadoPago:BaseUrl` | `MercadoPago__BaseUrl` | `https://api.mercadopago.com/` |
 | `BackgroundJobs:Enabled` | `BackgroundJobs__Enabled` | `false` = processo só HTTP (papel api) |
 | `GIT_SHA` | `GIT_SHA` | SHA do commit (preenchido pelo CI na imagem) |
 
@@ -114,6 +120,6 @@ Configuração inválida impede a API de subir (fail-fast).
 | 2 | Catálogo: produtos com variações, categorias, coleções com janela, cache da vitrine, limites do plano | ✅ |
 | 3 | Estoque: lotes com validade, FEFO, ledger append-only, reservas com expiração, concorrência com trava de linha | ✅ |
 | 4 | Checkout + Pedido + Outbox: cupons, zonas e capacidade de entrega, checkout transacional e idempotente, estados, abandonados, outbox com DLQ | ✅ |
-| 5 | Pagamentos (PIX, Mercado Pago) | |
+| 5 | Pagamentos: BR Code PIX, Mercado Pago com resiliência, webhook verificado, confirmação manual, token cifrado | ✅ |
 | 6 | Fidelidade, oficinas, PDV, orçamentos | |
 | 7 | Produção na AWS (ECS Fargate, RDS, Secrets Manager, CDK) | |

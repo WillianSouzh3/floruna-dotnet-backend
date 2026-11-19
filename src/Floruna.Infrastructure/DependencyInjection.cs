@@ -4,6 +4,7 @@ using Floruna.Application.Delivery;
 using Floruna.Application.Inventory;
 using Floruna.Application.Ordering;
 using Floruna.Application.Outbox;
+using Floruna.Application.Payments;
 using Floruna.Application.Promotions;
 using Floruna.Domain.Audit;
 using Floruna.Domain.Catalog;
@@ -12,6 +13,7 @@ using Floruna.Domain.Delivery;
 using Floruna.Domain.Identity;
 using Floruna.Domain.Inventory;
 using Floruna.Domain.Ordering;
+using Floruna.Domain.Payments;
 using Floruna.Domain.Platform;
 using Floruna.Domain.Promotions;
 using Floruna.Infrastructure.Catalog;
@@ -20,6 +22,7 @@ using Floruna.Infrastructure.Inventory;
 using Floruna.Infrastructure.Mail;
 using Floruna.Infrastructure.Ordering;
 using Floruna.Infrastructure.Outbox;
+using Floruna.Infrastructure.Payments;
 using Floruna.Infrastructure.Persistence;
 using Floruna.Infrastructure.Persistence.Repositories;
 using Floruna.Infrastructure.Security;
@@ -90,6 +93,12 @@ public static class DependencyInjection
         services.AddOptions<SeedOptions>().Bind(configuration.GetSection(SeedOptions.SectionName));
         services.AddOptions<SmtpSettings>().Bind(configuration.GetSection(SmtpSettings.SectionName));
         services.AddOptions<BackgroundJobsOptions>().Bind(configuration.GetSection(BackgroundJobsOptions.SectionName));
+        services.AddOptions<MercadoPagoOptions>().Bind(configuration.GetSection(MercadoPagoOptions.SectionName));
+        services.AddOptions<SecretsOptions>()
+            .Bind(configuration.GetSection(SecretsOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<SecretsOptions>, SecretsOptionsValidator>();
     }
 
     private static void AddPersistence(IServiceCollection services)
@@ -130,6 +139,22 @@ public static class DependencyInjection
         services.AddScoped<IDeliveryQueries>(sp => sp.GetRequiredService<CommerceQueries>());
         services.AddScoped<IOrderQueries>(sp => sp.GetRequiredService<CommerceQueries>());
         services.AddScoped<IOutboxAdmin, OutboxAdmin>();
+
+        // Pagamentos: repositório, cifra de segredos e o gateway com resiliência.
+        services.AddScoped<IPaymentRepository, PaymentRepository>();
+        services.AddSingleton<ISecretProtector, AesGcmSecretProtector>();
+        services.AddHttpClient<IPaymentGateway, MercadoPagoGateway>((sp, http) =>
+                http.BaseAddress = sp.GetRequiredService<IOptions<MercadoPagoOptions>>().Value.BaseUrl)
+            .AddStandardResilienceHandler(resilience =>
+            {
+                // Checkout não pode esperar muito: 8 s por tentativa, 20 s no total.
+                resilience.AttemptTimeout.Timeout = TimeSpan.FromSeconds(8);
+                resilience.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(20);
+                resilience.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(30);
+                // O padrão retenta também o POST. Aqui é seguro: ele vai com X-Idempotency-Key
+                // (sem a chave, seria preciso chamar Retry.DisableForUnsafeHttpMethods()).
+                resilience.Retry.MaxRetryAttempts = 2;
+            });
         services.AddSingleton<OutboxProcessor>();
         services.AddSingleton<AbandonedOrdersJob>();
 

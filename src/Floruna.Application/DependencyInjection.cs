@@ -38,6 +38,8 @@ public static class DependencyInjection
 
         // Serviço de aplicação compartilhado entre a cotação de entrega e o checkout.
         services.AddScoped<Delivery.DeliveryResolver>();
+        services.AddScoped<Payments.PaymentInitializer>();
+        services.AddScoped<Payments.PaymentConfirmation>();
 
         return services;
     }

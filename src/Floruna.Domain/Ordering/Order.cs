@@ -189,6 +189,19 @@ public sealed class Order : AggregateRoot<OrderId>, ITenantOwned
 
     public DateTimeOffset PaymentDeadline { get; private set; }
 
+    // Visão do pagamento no pedido (contrato do Nest). A fonte da verdade é o PaymentIntent;
+    // estes campos são uma cópia para a página do pedido não precisar de outra consulta.
+
+    /// <summary>Contrato: <c>pending</c>, <c>approved</c>, <c>rejected</c>, <c>cancelled</c>.</summary>
+    public string PaymentStatus { get; private set; } = "pending";
+
+    /// <summary>Contrato: <c>pending</c>, <c>ready</c>, <c>failed</c>.</summary>
+    public string PaymentInitializationStatus { get; private set; } = "pending";
+
+    public string? PaymentRail { get; private set; }
+
+    public string PixCode { get; private set; } = string.Empty;
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -263,6 +276,26 @@ public sealed class Order : AggregateRoot<OrderId>, ITenantOwned
         UpdatedAt = now;
         Raise(new OrderStatusChanged(Id, TenantId, change.From!.Value, target, now));
         return change;
+    }
+
+    public void PaymentReady(string rail, string pixCode, DateTimeOffset now)
+    {
+        PaymentRail = rail;
+        PixCode = pixCode;
+        PaymentInitializationStatus = "ready";
+        UpdatedAt = now;
+    }
+
+    public void PaymentInitializationFailed(DateTimeOffset now)
+    {
+        PaymentInitializationStatus = "failed";
+        UpdatedAt = now;
+    }
+
+    public void PaymentStatusChanged(string status, DateTimeOffset now)
+    {
+        PaymentStatus = status;
+        UpdatedAt = now;
     }
 
     public bool IsAbandonedAt(DateTimeOffset now) => Status == OrderStatus.Pendente && now >= PaymentDeadline;

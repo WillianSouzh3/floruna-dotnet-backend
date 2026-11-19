@@ -51,6 +51,22 @@ internal sealed partial class TenantHostResolver(
         return resolved;
     }
 
+    public async Task<ResolvedTenant?> ResolveBySlugAsync(string slug, CancellationToken cancellationToken)
+    {
+        var normalized = slug.Trim().ToLowerInvariant();
+        var key = $"tenant:slug:{normalized}";
+        if (cache.TryGetValue(key, out ResolvedTenant? cached))
+        {
+            return cached;
+        }
+
+        var resolved = await LoadAsync(("slug", normalized), cancellationToken);
+        cache.Set(key, resolved, new MemoryCacheEntryOptions()
+            .SetAbsoluteExpiration(options.Value.CacheTtl)
+            .AddExpirationToken(new CancellationChangeToken(_reset.Token)));
+        return resolved;
+    }
+
     public void Invalidate()
     {
         var previous = Interlocked.Exchange(ref _reset, new CancellationTokenSource());

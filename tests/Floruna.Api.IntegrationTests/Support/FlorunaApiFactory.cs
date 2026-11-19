@@ -38,6 +38,8 @@ public sealed class FlorunaApiFactory : WebApplicationFactory<Program>, IAsyncLi
             ["Database:MigrateOnStartup"] = "true",
             ["Jwt:Secret"] = JwtSecret,
             ["BackgroundJobs:Enabled"] = "false",
+            ["Secrets:EncryptionKey"] = "dGVzdHMtb25seS1lbmNyeXB0aW9uLWtleS0zMmJ5dGU=",
+            ["Platform:ApiPublicUrl"] = "https://api.floruna.test",
             [$"{RateLimitingSettings.SectionName}:{nameof(RateLimitingSettings.AuthPermitLimit)}"] = "10000",
             [$"{RateLimitingSettings.SectionName}:{nameof(RateLimitingSettings.CheckoutPermitLimit)}"] = "10000",
         }));

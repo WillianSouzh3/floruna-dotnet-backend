@@ -881,6 +881,25 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("payment_deadline");
 
+                    b.Property<string>("PaymentInitializationStatus")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("payment_initialization_status");
+
+                    b.Property<string>("PaymentRail")
+                        .HasColumnType("text")
+                        .HasColumnName("payment_rail");
+
+                    b.Property<string>("PaymentStatus")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("payment_status");
+
+                    b.Property<string>("PixCode")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("pix_code");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -933,6 +952,185 @@ namespace Floruna.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_orders_total_positive", "total_cents > 0");
                         });
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Payments.PaymentIntent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("AmountCents")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount_cents");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character(3)")
+                        .HasColumnName("currency")
+                        .IsFixedLength();
+
+                    b.Property<bool>("FallbackUsed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("fallback_used");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<long>("PaidAmountCents")
+                        .HasColumnType("bigint")
+                        .HasColumnName("paid_amount_cents");
+
+                    b.Property<DateTimeOffset?>("PaidAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("paid_at");
+
+                    b.Property<string>("PixCode")
+                        .IsRequired()
+                        .HasMaxLength(600)
+                        .HasColumnType("character varying(600)")
+                        .HasColumnName("pix_code");
+
+                    b.Property<string>("ProviderPaymentId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("provider_payment_id");
+
+                    b.Property<string>("Rail")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("rail");
+
+                    b.Property<string>("ReconciliationIssue")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("reconciliation_issue");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_payment_intents");
+
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("ix_payment_intents_order_id");
+
+                    b.HasIndex("ReconciliationIssue")
+                        .HasDatabaseName("ix_payment_intents_reconciliation_issue")
+                        .HasFilter("reconciliation_issue IS NOT NULL");
+
+                    b.HasIndex("TenantId", "OrderId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_payment_intents_tenant_id_order_id");
+
+                    b.HasIndex("TenantId", "ProviderPaymentId")
+                        .HasDatabaseName("ix_payment_intents_tenant_id_provider_payment_id")
+                        .HasFilter("provider_payment_id IS NOT NULL");
+
+                    b.ToTable("payment_intents", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_payment_intents_amount_positive", "amount_cents > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Payments.PaymentNotification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("ProviderPaymentId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("provider_payment_id");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_payment_notifications");
+
+                    b.HasIndex("TenantId", "ProviderPaymentId", "ReceivedAt")
+                        .HasDatabaseName("ix_payment_notifications_tenant_id_provider_payment_id_receive");
+
+                    b.ToTable("payment_notifications", (string)null);
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Payments.PaymentSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("MercadoPagoTokenCiphertext")
+                        .HasMaxLength(600)
+                        .HasColumnType("character varying(600)")
+                        .HasColumnName("mercado_pago_token_ciphertext");
+
+                    b.Property<bool>("OfflineFallbackEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("offline_fallback_enabled");
+
+                    b.Property<string>("PixCity")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("pix_city");
+
+                    b.Property<string>("PixKey")
+                        .IsRequired()
+                        .HasMaxLength(77)
+                        .HasColumnType("character varying(77)")
+                        .HasColumnName("pix_key");
+
+                    b.Property<string>("PixReceiverName")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("pix_receiver_name");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<bool>("UseMercadoPago")
+                        .HasColumnType("boolean")
+                        .HasColumnName("use_mercado_pago");
+
+                    b.HasKey("Id")
+                        .HasName("pk_payment_settings");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_payment_settings_tenant_id");
+
+                    b.ToTable("payment_settings", (string)null);
                 });
 
             modelBuilder.Entity("Floruna.Domain.Platform.Tenant", b =>
@@ -1780,6 +1978,77 @@ namespace Floruna.Infrastructure.Persistence.Migrations
                     b.Navigation("History");
 
                     b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Payments.PaymentIntent", b =>
+                {
+                    b.HasOne("Floruna.Domain.Ordering.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_payment_intents_orders_order_id");
+
+                    b.OwnsMany("Floruna.Domain.Payments.PaymentTransaction", "Transactions", b1 =>
+                        {
+                            b1.Property<Guid>("PaymentIntentId");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAdd();
+
+                            b1.Property<string>("ActorId");
+
+                            b1.Property<string>("ActorType")
+                                .IsRequired();
+
+                            b1.Property<long>("AmountCents");
+
+                            b1.Property<string>("EvidenceNote");
+
+                            b1.Property<string>("EvidenceReference");
+
+                            b1.Property<string>("EvidenceType");
+
+                            b1.Property<string>("ExternalId");
+
+                            b1.Property<string>("IdempotencyKey")
+                                .IsRequired();
+
+                            b1.Property<DateTimeOffset>("ObservedAt");
+
+                            b1.Property<string>("Source")
+                                .IsRequired()
+                                .HasMaxLength(32);
+
+                            b1.Property<string>("Status")
+                                .IsRequired()
+                                .HasMaxLength(32);
+
+                            b1.HasKey("PaymentIntentId", "__synthesizedOrdinal")
+                                .HasName("pk_payment_intents");
+
+                            b1.ToTable("payment_intents");
+
+                            b1
+                                .ToJson("transactions")
+                                .HasColumnType("jsonb");
+
+                            b1.WithOwner()
+                                .HasForeignKey("PaymentIntentId")
+                                .HasConstraintName("fk_payment_intents_payment_intents_payment_intent_id");
+                        });
+
+                    b.Navigation("Transactions");
+                });
+
+            modelBuilder.Entity("Floruna.Domain.Payments.PaymentSettings", b =>
+                {
+                    b.HasOne("Floruna.Domain.Platform.Tenant", null)
+                        .WithOne()
+                        .HasForeignKey("Floruna.Domain.Payments.PaymentSettings", "TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_payment_settings_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Floruna.Domain.Promotions.Coupon", b =>

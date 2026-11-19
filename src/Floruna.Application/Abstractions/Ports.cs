@@ -62,6 +62,9 @@ public interface ITenantResolver
 {
     Task<ResolvedTenant?> ResolveByHostAsync(string host, CancellationToken cancellationToken);
 
+    /// <summary>Pelo slug (ex.: webhook do gateway, que chega no host da API com <c>?tenant=</c>).</summary>
+    Task<ResolvedTenant?> ResolveBySlugAsync(string slug, CancellationToken cancellationToken);
+
     /// <summary>Descarta o cache (após criar/alterar loja).</summary>
     void Invalidate();
 }
