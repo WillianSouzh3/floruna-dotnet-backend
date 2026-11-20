@@ -28,6 +28,9 @@ env:
 
 jobs:
   image:
+    # Liga só depois do setup da AWS (docs/aws.md, seção 3): Settings > Variables > DEPLOY_ENABLED = true.
+    # Sem isso, o workflow é PULADO (cinza), em vez de falhar a cada push por falta de credencial.
+    if: vars.DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

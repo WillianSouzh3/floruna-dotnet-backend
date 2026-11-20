@@ -76,8 +76,9 @@ Pré-requisitos: conta AWS, AWS CLI autenticado como administrador, Node.js 22, 
    - *Environments*: `staging` e `prod`; em `prod`, **Required reviewers** (aprovação manual).
 5. **`cdk.context.json`**: rode `npx aws-cdk@2 synth -c account=<CONTA>` uma vez com credencial e faça commit do
    arquivo atualizado (lista de AZs da conta). Synth sem chamadas à AWS = builds reprodutíveis.
-6. **Deploy**: push na `main` (staging) ou *Actions → Deploy → Run workflow → prod*.
-7. **DNS**: aponte `api.<domínio>` (CNAME/alias) para a saída `ApiUrl` da pilha App. Configure o BFF com essa URL.
+6. **Ligar o deploy**: *Variables* → `DEPLOY_ENABLED` = `true` (até lá, o workflow é pulado).
+7. **Deploy**: push na `main` (staging) ou *Actions → Deploy → Run workflow → prod*.
+8. **DNS**: aponte `api.<domínio>` (CNAME/alias) para a saída `ApiUrl` da pilha App. Configure o BFF com essa URL.
 
 ## 4. Pipeline de deploy (`.github/workflows/deploy.yml`)
 
