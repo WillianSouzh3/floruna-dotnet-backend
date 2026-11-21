@@ -44,6 +44,18 @@ export NEST_SETTINGS_ENCRYPTION_KEY="..."         # SETTINGS_ENCRYPTION_KEY do N
 dotnet run --project src/Floruna.Migration -- --mongo "$MONGODB_URI" --mongo-db flora-lis --tenant flora-lis --dry-run
 ```
 
+Na VPS (docs/vps.md), com a mesma imagem da API e as credenciais lidas do servidor (nada na linha de comando):
+
+```bash
+cd ~/floruna-dotnet
+set -a; . ./.env; set +a
+NEST_MONGODB_URI="$(grep -E '^MONGODB_URI=' ~/flora-lis/.env | cut -d= -f2-)" \
+NEST_SETTINGS_ENCRYPTION_KEY="$(grep -E '^SETTINGS_ENCRYPTION_KEY=' ~/flora-lis/.env | cut -d= -f2-)" \
+docker compose -f docker-compose.prod.yml run --rm --no-deps \
+  -e NEST_MONGODB_URI -e NEST_SETTINGS_ENCRYPTION_KEY \
+  --entrypoint dotnet api /app/migration/Floruna.Migration.dll --tenant flora-lis --dry-run
+```
+
 O `--dry-run` faz TUDO (inclusive a conferência) e desfaz no fim. Repita até o relatório sair limpo.
 Para re-ensaiar sobre uma loja já gravada: `--replace` (apaga a loja inteira no PostgreSQL e refaz; as tabelas são
 descobertas, não listadas à mão).

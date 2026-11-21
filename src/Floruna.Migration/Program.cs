@@ -23,7 +23,7 @@ internal static class MigrationCli
         var options = CliArgs.Parse(args);
         if (options is null)
         {
-            await Console.Error.WriteLineAsync("Uso: --mongo <uri> --mongo-db <banco> --tenant <slug> [--dry-run] [--replace] [--force]");
+            await Console.Error.WriteLineAsync("Uso: --tenant <slug> [--mongo <uri> | env NEST_MONGODB_URI] [--mongo-db <banco>] [--dry-run] [--replace] [--force]");
             return 2;
         }
 
@@ -52,7 +52,12 @@ internal static class MigrationCli
         public static CliArgs? Parse(string[] args)
         {
             string? Value(string name) => Array.IndexOf(args, name) is var i and >= 0 && i + 1 < args.Length ? args[i + 1] : null;
-            return Value("--mongo") is { } uri && Value("--mongo-db") is { } database && Value("--tenant") is { } tenant
+
+            // A URI do Mongo pode vir por variável (NEST_MONGODB_URI): na linha de comando ela ficaria visível na
+            // lista de processos do servidor. O banco, se omitido, sai do caminho da URI.
+            var uri = Value("--mongo") ?? Environment.GetEnvironmentVariable("NEST_MONGODB_URI");
+            var database = Value("--mongo-db") ?? (uri is null ? null : MongoUrl.Create(uri).DatabaseName);
+            return uri is not null && database is not null && Value("--tenant") is { } tenant
                 ? new CliArgs(uri, database, tenant, args.Contains("--dry-run"), args.Contains("--replace"), args.Contains("--force"))
                 : null;
         }

@@ -11,9 +11,12 @@ COPY src/Floruna.Domain/*.csproj src/Floruna.Domain/
 COPY src/Floruna.Application/*.csproj src/Floruna.Application/
 COPY src/Floruna.Infrastructure/*.csproj src/Floruna.Infrastructure/
 COPY src/Floruna.Api/*.csproj src/Floruna.Api/
-RUN dotnet restore src/Floruna.Api/Floruna.Api.csproj
+COPY src/Floruna.Migration/*.csproj src/Floruna.Migration/
+RUN dotnet restore src/Floruna.Api/Floruna.Api.csproj && dotnet restore src/Floruna.Migration/Floruna.Migration.csproj
 COPY src/ src/
 RUN dotnet publish src/Floruna.Api/Floruna.Api.csproj -c Release -o /app --no-restore
+# O ETL do Nest vai junto, em pasta própria: roda no servidor com a MESMA imagem (docs/migracao.md).
+RUN dotnet publish src/Floruna.Migration/Floruna.Migration.csproj -c Release -o /app/migration --no-restore
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
