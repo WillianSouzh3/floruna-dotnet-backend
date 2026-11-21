@@ -1,0 +1,152 @@
+# Floruna .NET na VPS da Hostinger (compartilhada com outros sistemas: ver docs/vps.md).
+#
+# Fica ISOLADO: banco próprio, sem porta publicada na internet. A API entra também na rede do
+# flora-lis (BFF) com o nome `floruna-api`; o BFF só manda tráfego para ela quando DOTNET_API_URL
+# for configurado (Strangler Fig por loja, docs/migracao.md). Até lá, impacto zero.
+#
+# Variáveis em /home/deploy/floruna-dotnet/.env (permissão 600):
+#   IMAGE, TAG              imagem (ghcr.io) e tag (SHA do commit; o deploy atualiza)
+#   POSTGRES_PASSWORD       senha do banco (aleatória)
+#   AUTH_SECRET             o MESMO do flora-lis: a sessão vale nos dois backends durante a transição
+#   ENCRYPTION_KEY          chave dos segredos das lojas (aleatória, 64 caracteres)
+#   PLATFORM_DOMAIN         ex.: floruna.com.br (loja = subdomínio)
+#   BACKUP_S3_BUCKET, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_REGION, S3_ENDPOINT   (cópia externa do backup)
+name: floruna-dotnet
+
+x-database: &database
+  Database__Host: db
+  Database__Port: "5432"
+  Database__Name: floruna
+  Database__Username: floruna
+  Database__Password: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+  Database__SslMode: Disable # rede interna do docker, banco sem porta publicada
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: floruna
+      POSTGRES_USER: floruna
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+    # VPS de 2 vCPU dividida com outros sistemas: banco enxuto.
+    command: ["postgres", "-c", "shared_buffers=128MB", "-c", "max_connections=60", "-c", "work_mem=4MB"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U floruna -d floruna"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 512m
+
+  # Roda as migrations e sai. O deploy chama ANTES de trocar a API (mesmo binário da versão nova).
+  migrate:
+    image: ${IMAGE:?defina IMAGE no .env}:${TAG:?defina TAG no .env}
+    profiles: ["migrate"]
+    command: ["migrate"]
+    environment:
+      <<: *database
+      Logging__Console__FormatterName: json
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    image: ${IMAGE:?defina IMAGE no .env}:${TAG:?defina TAG no .env}
+    restart: unless-stopped
+    environment:
+      <<: *database
+      ASPNETCORE_ENVIRONMENT: Production
+      Jwt__Secret: ${AUTH_SECRET:?defina AUTH_SECRET no .env (o mesmo do flora-lis)}
+      Secrets__EncryptionKey: ${ENCRYPTION_KEY:?defina ENCRYPTION_KEY no .env}
+      Platform__Domain: ${PLATFORM_DOMAIN:-floruna.com.br}
+      Platform__ApiPublicUrl: ${API_PUBLIC_URL:-}
+      # Um processo só faz HTTP e jobs (outbox, expirações): a VPS é pequena para separar papéis.
+      BackgroundJobs__Enabled: "true"
+      # O IP real vem do BFF (x-forwarded-for); só é aceito de dentro das redes do docker.
+      Network__TrustedProxies__0: 172.16.0.0/12
+      Logging__Console__FormatterName: json
+      # GC de estação de trabalho: menos memória reservada (a máquina é dividida com outros sistemas).
+      DOTNET_gcServer: "0"
+      GIT_SHA: ${TAG}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      default: {}
+      bff:
+        aliases: [floruna-api]
+    mem_limit: 768m
+
+  # Backup: pg_dump a cada 6 h (28 cópias = 7 dias) e cópia externa no mesmo S3 do backup do flora-lis.
+  backup:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    profiles: ["backup"]
+    environment:
+      PGHOST: db
+      PGUSER: floruna
+      PGPASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+      PGDATABASE: floruna
+      BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-6}
+      BACKUP_KEEP: ${BACKUP_KEEP:-28}
+    volumes:
+      - backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        trap exit TERM
+        while :; do
+          TS=$$(date +%Y%m%d_%H%M%S)
+          if pg_dump --format=custom --file="/backups/floruna-dotnet_$$TS.dump"; then
+            echo "[backup] ok: floruna-dotnet_$$TS.dump"
+          else
+            echo "[backup] FALHOU em $$TS" >&2
+            rm -f "/backups/floruna-dotnet_$$TS.dump"
+          fi
+          ls -t /backups/floruna-dotnet_*.dump 2>/dev/null | tail -n +$$((BACKUP_KEEP + 1)) | xargs -r rm -f
+          sleep $$((BACKUP_INTERVAL_HOURS * 3600)) & wait $${!}
+        done
+    mem_limit: 256m
+
+  backup-sync:
+    image: amazon/aws-cli:2.31.0
+    restart: unless-stopped
+    profiles: ["backup"]
+    depends_on: [backup]
+    volumes:
+      - backups:/backups:ro
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_DEFAULT_REGION: ${S3_REGION:-us-east-1}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        trap exit TERM
+        [ -z "$$BACKUP_S3_BUCKET" ] && echo "[backup-sync] BACKUP_S3_BUCKET vazio: backup fica SÓ nesta VPS."
+        while :; do
+          if [ -n "$$BACKUP_S3_BUCKET" ]; then
+            aws s3 sync $${S3_ENDPOINT:+--endpoint-url "$$S3_ENDPOINT"} /backups "s3://$$BACKUP_S3_BUCKET/floruna-dotnet/" \
+              --exclude "*" --include "floruna-dotnet_*.dump" && echo "[backup-sync] sincronizado em $$(date -Iseconds)"
+          fi
+          sleep 3600 & wait $${!}
+        done
+    mem_limit: 128m
+
+volumes:
+  pgdata:
+  backups:
+
+networks:
+  bff:
+    external: true
+    name: flora-lis_default

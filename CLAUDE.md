@@ -4,7 +4,7 @@
 
 Backend multi-tenant de e-commerce para floriculturas. É a reescrita em .NET 10 do backend NestJS + MongoDB (`../flora-lis-site/api`) e mantém o **contrato HTTP idêntico** (`/api/v1`, envelope `{data,meta}`/`{error,meta}`, JWT HS256, header `x-tenant-host`) para reutilizar o front Next.js. Monólito modular com Clean Architecture, DDD, CQRS e **Mediator próprio** (sem MediatR).
 
-**Stack**: .NET 10, ASP.NET Core Controllers, EF Core + PostgreSQL 17, FluentValidation, OpenTelemetry, Mercado Pago (PIX), xUnit + Shouldly + NSubstitute + Testcontainers, AWS CDK em C# (ECS Fargate + RDS, sa-east-1).
+**Stack**: .NET 10, ASP.NET Core Controllers, EF Core + PostgreSQL 17, FluentValidation, OpenTelemetry, Mercado Pago (PIX), xUnit + Shouldly + NSubstitute + Testcontainers. Produção: VPS Hostinger compartilhada via docker compose (docs/vps.md); o AWS CDK em `infra/` é material de estudo, com deploy desligado.
 
 **Structure**: `src/` com `SharedKernel ← Domain ← Application ← Infrastructure ← Api` (+ `Migration`, o ETL Mongo→Postgres por loja); `tests/` com 4 projetos; `infra/` com CDK (solução separada, net8.0); `docs/` com plano, ADRs 0001–0016 e o snapshot OpenAPI.
 
@@ -28,4 +28,5 @@ dotnet test tests/Floruna.Domain.UnitTests    # rápido, sem Docker
 dotnet test Floruna.slnx                      # suíte completa (Docker necessário)
 ```
 
-O SDK local pode ser só o 8.0. Nesse caso, compile no container `mcr.microsoft.com/dotnet/sdk:10.0` ou instale o `dotnet-sdk-10.0`.
+A infra (`infra/`, CDK) roda com `JSII_RUNTIME_PACKAGE_CACHE=disabled` se o `~/.cache` for gravável pelo grupo.
+A VPS de produção é compartilhada com outros sistemas: leia docs/vps.md antes de qualquer ação nela.

@@ -1,0 +1,111 @@
+name: Deploy VPS (Hostinger)
+
+# Deploy na VPS da Hostinger, compartilhada com outros sistemas em produção (docs/vps.md).
+# Roda quando o CI da main passa (a imagem já está no ghcr.io) ou à mão.
+#
+# Ordem: valida o .env → login no ghcr.io com o token EFÊMERO deste job (nada fica salvo no servidor)
+# → pull → migrations com a imagem nova → troca da API → fumaça → se a fumaça falhar, volta a tag anterior.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false # nunca interromper um deploy no meio
+
+jobs:
+  deploy:
+    # Liga depois do setup único da VPS (docs/vps.md): variável de repositório VPS_DEPLOY_ENABLED = true.
+    if: vars.VPS_DEPLOY_ENABLED == 'true' && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
+
+      - name: Nome da imagem
+        run: echo "IMAGE=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+
+      - name: Envia o compose para a VPS
+        uses: appleboy/scp-action@917f8b81dfc1ccd331fef9e2d61bdc6c8be94634 # v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: deploy/vps/docker-compose.prod.yml
+          target: /home/deploy/floruna-dotnet/
+          strip_components: 2
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # v1.0.3
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: SHA,IMAGE,GHCR_TOKEN,GITHUB_ACTOR
+          command_timeout: 15m
+          script: |
+            set -euo pipefail
+            cd /home/deploy/floruna-dotnet
+            COMPOSE="docker compose -f docker-compose.prod.yml"
+
+            # 1. .env do servidor: valida ANTES de tocar em qualquer container.
+            [ -f .env ] || { echo "::error::/home/deploy/floruna-dotnet/.env não existe (ver docs/vps.md)."; exit 1; }
+            ev() { grep -E "^$1=" .env | tail -1 | sed "s/^$1=//" || true; }
+            for key in POSTGRES_PASSWORD AUTH_SECRET ENCRYPTION_KEY; do
+              [ -n "$(ev "$key")" ] || { echo "::error::.env: $key ausente."; exit 1; }
+            done
+            [ "$(ev AUTH_SECRET | wc -c)" -gt 32 ] || { echo "::error::.env: AUTH_SECRET precisa de 32+ caracteres."; exit 1; }
+
+            # 2. Tag atual (para voltar) e a nova.
+            PREVIOUS="$(ev TAG)"
+            set_tag() { sed -i "/^TAG=/d;/^IMAGE=/d" .env; printf 'IMAGE=%s\nTAG=%s\n' "$IMAGE" "$1" >> .env; }
+
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+            trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+            # Pull ANTES de gravar a tag: se falhar, o .env continua apontando para a versão que está no ar.
+            TAG="$SHA" $COMPOSE pull api
+            set_tag "$SHA"
+
+            # 3. Banco de pé e migrations com o binário NOVO, antes de trocar a API.
+            $COMPOSE up -d db
+            $COMPOSE --profile migrate run --rm migrate
+
+            # 4. Troca e fumaça (a imagem do ASP.NET não tem curl: a checagem vem de um container na mesma rede).
+            $COMPOSE up -d api
+            smoke() {
+              for i in $(seq 1 30); do
+                if docker run --rm --network floruna-dotnet_default curlimages/curl:8.11.1 -fsS --max-time 5 \
+                     http://api:4000/api/v1/health/ready >/dev/null 2>&1; then return 0; fi
+                sleep 3
+              done
+              return 1
+            }
+            if ! smoke; then
+              echo "::error::API não ficou pronta com $SHA."
+              $COMPOSE logs --tail 80 api || true
+              if [ -n "$PREVIOUS" ]; then
+                echo "Voltando para $PREVIOUS (migrations são compatíveis com a versão anterior: expand/contract)."
+                set_tag "$PREVIOUS"
+                $COMPOSE up -d api
+              fi
+              exit 1
+            fi
+
+            # 5. Backup sempre ligado; limpa imagens antigas DESTE projeto (mantém as 3 últimas).
+            $COMPOSE --profile backup up -d backup backup-sync
+            docker images "$IMAGE" --format '{{.Tag}} {{.ID}}' | grep -v '^main ' | tail -n +4 | awk '{print $2}' | xargs -r docker rmi || true
+            echo "Deploy de $SHA concluído."

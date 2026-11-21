@@ -1,4 +1,4 @@
-name: Deploy
+name: Deploy AWS (estudo, desligado)
 
 # Deploy para a AWS. Sem chave de acesso guardada no GitHub: o job troca o token OIDC do GitHub
 # por uma credencial TEMPORÁRIA de uma role IAM que só confia neste repositório (ver docs/aws.md).

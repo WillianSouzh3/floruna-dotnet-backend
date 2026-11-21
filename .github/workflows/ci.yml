@@ -76,8 +76,19 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     needs: build-test
+    permissions:
+      contents: read
+      packages: write # publicar no ghcr.io (só em push na main)
     steps:
       - uses: actions/checkout@v4
-      - name: Build image
-        run: docker build --build-arg GIT_SHA=${{ github.sha }} -t floruna-api:${{ github.sha }} .
-      # Push para o ECR acontece no workflow de deploy (deploy.yml), com credencial temporária via OIDC.
+      - name: Nome da imagem
+        run: echo "IMAGE=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+      - name: Build
+        run: docker build --build-arg GIT_SHA=${{ github.sha }} -t "$IMAGE:${{ github.sha }}" -t "$IMAGE:main" .
+      # Só a main publica: é dessa imagem que o deploy na VPS (deploy-vps.yml) faz pull.
+      - name: Publica no ghcr.io
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker push "$IMAGE:${{ github.sha }}"
+          docker push "$IMAGE:main"
