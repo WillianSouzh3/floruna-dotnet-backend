@@ -167,6 +167,20 @@ public sealed class NestMigrationTests(FlorunaApiFactory factory) : IAsyncLifeti
     }
 
     [Fact]
+    public async Task Dry_run_reports_blockers_and_still_rehearses_the_whole_import()
+    {
+        var seed = await SeedStoreAsync(pendingOrder: true);
+
+        var report = await MigrateAsync(new MigrationRequest(seed.Slug, DryRun: true));
+
+        report.Committed.ShouldBeFalse();
+        report.Blockers.ShouldContain(b => b.Contains("pendente", StringComparison.Ordinal));
+        report.Imported["produtos"].ShouldBe(2); // o ensaio foi até o fim mesmo com bloqueio
+        report.Reconciled.ShouldBeTrue();
+        ReportFormatter.Format(report).ShouldContain("NÃO elegível");
+    }
+
+    [Fact]
     public void Legacy_ids_are_deterministic_and_distinct_per_kind()
     {
         var id = ObjectId.GenerateNewId();

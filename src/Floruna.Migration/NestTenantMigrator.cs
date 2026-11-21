@@ -34,6 +34,8 @@ public sealed class MigrationReport
 
     public bool Committed { get; set; }
 
+    public bool DryRun { get; set; }
+
     public SortedDictionary<string, int> Imported { get; } = new(StringComparer.Ordinal);
 
     public List<string> Blockers { get; } = [];
@@ -100,7 +102,7 @@ public sealed class NestTenantMigrator(IMongoDatabase mongo, FlorunaDbContext db
     public async Task<MigrationReport> MigrateAsync(MigrationRequest request, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var report = new MigrationReport { Tenant = request.TenantSlug };
+        var report = new MigrationReport { Tenant = request.TenantSlug, DryRun = request.DryRun };
         var source = await Collection("tenants").Find(new BsonDocument("slug", request.TenantSlug)).FirstOrDefaultAsync(ct);
         if (source is null)
         {
@@ -112,7 +114,9 @@ public sealed class NestTenantMigrator(IMongoDatabase mongo, FlorunaDbContext db
         var tenantId = new TenantId(LegacyIds.For("tenant", legacyTenant));
         report.TenantId = tenantId.Value;
         await CheckEligibilityAsync(legacyTenant, request, report, ct);
-        if (report.Blockers.Count > 0)
+        // No ensaio, bloqueio de elegibilidade NÃO interrompe: o ensaio importa tudo (e desfaz) para mostrar
+        // de uma vez o que mais daria errado (recusas, conferência). No corte de verdade, para aqui.
+        if (report.Blockers.Count > 0 && !request.DryRun)
         {
             return report;
         }

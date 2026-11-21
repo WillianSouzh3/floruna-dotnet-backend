@@ -10,7 +10,9 @@ public static class ReportFormatter
         ArgumentNullException.ThrowIfNull(report);
         var text = new StringBuilder();
         text.AppendLine($"== Migração da loja {report.Tenant} ({report.TenantId}) ==");
-        text.AppendLine(report.Committed ? "RESULTADO: gravado." : report.Blockers.Count > 0 ? "RESULTADO: NÃO migrado." : "RESULTADO: ensaio sem gravar.");
+        text.AppendLine(report.Committed ? "RESULTADO: gravado."
+            : report.DryRun ? (report.Blockers.Count > 0 ? "RESULTADO: ensaio (nada gravado). Loja NÃO elegível ainda: ver bloqueios." : "RESULTADO: ensaio (nada gravado). Loja elegível.")
+            : "RESULTADO: NÃO migrado.");
         foreach (var blocker in report.Blockers)
         {
             text.AppendLine($"  [BLOQUEIO] {blocker}");
