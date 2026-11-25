@@ -4,6 +4,11 @@
 # flora-lis (BFF) com o nome `floruna-api`; o BFF só manda tráfego para ela quando DOTNET_API_URL
 # for configurado (Strangler Fig por loja, docs/migracao.md). Até lá, impacto zero.
 #
+# O SERVIÇO se chama `floruna-api`, nunca `api`: o Compose registra o nome do serviço como apelido
+# em TODAS as redes dele, e `api` é o nome da API Nest na rede do flora-lis. Com o nome antigo, o
+# DNS do docker dividia `http://api:4000` entre as duas APIs e o BFF mandava parte das requests de
+# todas as lojas para o .NET (incidente de 2026-11-25).
+#
 # Variáveis em /home/deploy/floruna-dotnet/.env (permissão 600):
 #   IMAGE, TAG              imagem (ghcr.io) e tag (SHA do commit; o deploy atualiza)
 #   POSTGRES_PASSWORD       senha do banco (aleatória)
@@ -52,7 +57,7 @@ services:
       db:
         condition: service_healthy
 
-  api:
+  floruna-api:
     image: ${IMAGE:?defina IMAGE no .env}:${TAG:?defina TAG no .env}
     restart: unless-stopped
     environment:
@@ -75,8 +80,7 @@ services:
         condition: service_healthy
     networks:
       default: {}
-      bff:
-        aliases: [floruna-api]
+      bff: {}
     mem_limit: 768m
 
   # Backup: pg_dump a cada 6 h (28 cópias = 7 dias) e cópia externa no mesmo S3 do backup do flora-lis.

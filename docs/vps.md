@@ -11,9 +11,9 @@ VPS
 ├── flora-lis_default (rede do flora-lis)
 │   ├── web (Next.js/BFF) ──► api:4000 (Nest)          ← tráfego de hoje
 │   │                     └─► floruna-api:4000 (.NET)  ← só lojas em DOTNET_TENANT_HOSTS
-│   └── floruna-api  (alias da API .NET nesta rede)
+│   └── floruna-api  (API .NET; o serviço NÃO pode se chamar `api`: ver o compose)
 └── floruna-dotnet_default (rede própria)
-    ├── api      (.NET: HTTP + jobs, mem 768 MB)
+    ├── floruna-api (.NET: HTTP + jobs, mem 768 MB)
     ├── db       (PostgreSQL 17, sem porta publicada, mem 512 MB)
     ├── backup   (pg_dump a cada 6 h, 7 dias)
     └── backup-sync (cópia no mesmo S3 do backup do flora-lis, prefixo floruna-dotnet/)
@@ -86,7 +86,7 @@ Daí em diante, todo push na `main` com CI verde implanta sozinho.
 ssh deploy@2.24.31.169
 cd ~/floruna-dotnet
 docker compose -f docker-compose.prod.yml ps
-docker compose -f docker-compose.prod.yml logs -f --tail 100 api      # logs em JSON
+docker compose -f docker-compose.prod.yml logs -f --tail 100 floruna-api      # logs em JSON
 docker compose -f docker-compose.prod.yml exec db psql -U floruna       # banco
 ```
 

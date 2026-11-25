@@ -77,7 +77,7 @@ jobs:
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
             trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
             # Pull ANTES de gravar a tag: se falhar, o .env continua apontando para a versão que está no ar.
-            TAG="$SHA" $COMPOSE pull api
+            TAG="$SHA" $COMPOSE pull floruna-api
             set_tag "$SHA"
 
             # 3. Banco de pé e migrations com o binário NOVO, antes de trocar a API.
@@ -85,22 +85,22 @@ jobs:
             $COMPOSE --profile migrate run --rm migrate
 
             # 4. Troca e fumaça (a imagem do ASP.NET não tem curl: a checagem vem de um container na mesma rede).
-            $COMPOSE up -d api
+            $COMPOSE up -d --remove-orphans floruna-api
             smoke() {
               for i in $(seq 1 30); do
                 if docker run --rm --network floruna-dotnet_default curlimages/curl:8.11.1 -fsS --max-time 5 \
-                     http://api:4000/api/v1/health/ready >/dev/null 2>&1; then return 0; fi
+                     http://floruna-api:4000/api/v1/health/ready >/dev/null 2>&1; then return 0; fi
                 sleep 3
               done
               return 1
             }
             if ! smoke; then
               echo "::error::API não ficou pronta com $SHA."
-              $COMPOSE logs --tail 80 api || true
+              $COMPOSE logs --tail 80 floruna-api || true
               if [ -n "$PREVIOUS" ]; then
                 echo "Voltando para $PREVIOUS (migrations são compatíveis com a versão anterior: expand/contract)."
                 set_tag "$PREVIOUS"
-                $COMPOSE up -d api
+                $COMPOSE up -d --remove-orphans floruna-api
               fi
               exit 1
             fi
